@@ -1,26 +1,12 @@
 const NavBar = () => {
   return (
-    <nav className="bg-blue-600 text-white px-4 py-3">
-      <div className="container mx-auto flex justify-between items-center">
-        <div className="font-semibold text-xl">BrandName</div>
-        <ul className="flex space-x-4">
-          <li>
-           
-              <a className="hover:text-blue-300">Home</a>
-            
-          </li>
-          <li>
-            
-              <a className="hover:text-blue-300">About</a>
-          
-          </li>
-          <li>
-            
-              <a className="hover:text-blue-300">Contact</a>
-           
-          </li>
-          {/* Additional navigation links */}
-        </ul>
+    <nav className="bg-blue-700 text-white px-4 py-3 ">
+      <div className="container flex justify-between items-center">
+        <div className="flex items-center transition duration-300 ease-in-out p-2 rounded">
+          <img src="/mechanical-arm-icon.png" alt="RoboRetiever Logo" className="h-10 mr-3" />
+          <span className="font-bold text-2xl tracking-wide">RoboRetriever</span>
+        </div>
+        {/* Add other nav items here if needed */}
       </div>
     </nav>
   );

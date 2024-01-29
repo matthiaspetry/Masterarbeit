@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template,Response
 from flask_cors import CORS
 import threading
 import time
@@ -79,6 +79,7 @@ class LayerNormFastViT3DPosition(nn.Module):
 
 def main_processing_loop():
     global is_processing_active
+    global cap
 
     model = YOLO("yolov8s.yaml")  # build a new model from scratch
     model = YOLO("/Users/matthiaspetry/Desktop/Masterarbeit/Yolov8_best.pt")
@@ -97,12 +98,10 @@ def main_processing_loop():
     model2.load_state_dict(state_dict2)
     model2.to("cpu")
     model2.eval()
-
-
-
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+
     if not cap.isOpened():
         print("Cannot open camera")
         exit() 
@@ -210,7 +209,20 @@ def main_processing_loop():
                                 break
 
 
+def gen_frames(cap):  
+    while True:
+        success, frame = cap.read()  # read the camera frame
+        if not success:
+            break
+        else:
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
+@app.route('/video_feed')
+def video_feed():
+    return Response(gen_frames(cap), mimetype='multipart/x-mixed-replace; boundary=frame')
             
 
 @app.route('/start_processing', methods=['POST'])
@@ -262,7 +274,7 @@ def connect_robot():
 
     return jsonify({'message': f'Robot connected'})
 
-@app.route('/move_base', methods=['POST'])
+@app.route('/move_2_base', methods=['POST'])
 def move_base():
     #rtde_c.moveJ([0.0000,-1.5708,-0.0000,-1.5708,-0.0000,0.0000])
 
