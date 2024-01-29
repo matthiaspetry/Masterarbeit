@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Robot Control Dashboard</title>
+    <script>
+        function sendCommand(url, data) {
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Success:', data);
+        updateStatus(data.message);
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+    });
+}
+
+function updateStatus(message) {
+    const statusDiv = document.getElementById('statusMessage');
+    statusDiv.innerText = message;
+}
+
+        function startProcessing() {
+            sendCommand('/start_processing', {});
+        }
+        function connectRobot() {
+            sendCommand('/connect_robot', {});
+        }
+
+        function moveBase() {
+            sendCommand('/move_base', {});
+        }
+        function stopProcessing() {
+            sendCommand('/stop_processing', {});
+        }
+
+        function selectObject() {
+            var object = document.getElementById("objectType").value;
+            sendCommand('/select_object', { object_type: object });
+        }
+    </script>
+</head>
+<body>
+    <h1>Robot Control Dashboard</h1>
+
+    <button onclick="startProcessing()">Start Processing</button>
+    <button onclick="connectRobot()">Connect Robot</button>
+    <button onclick="stopProcessing()">Stop Processing</button>
+    <button onclick="moveBase()">Back to Base</button>
+
+    <div id="statusMessage"></div>
+
+    <div>
+        <label for="objectType">Select Object:</label>
+        <select id="objectType">
+            <option value="0">Cross</option>
+            <option value="1">Cube</option>
+            <option value="2">Cylinder</option>
+            <option value="3">Hexagon</option>
+            <option value="4">Pyramid</option>
+            <option value="5">R_Cylinder</option>
+            <option value="6">Star</option>
+            <option value="7">Y_Cube</option>
+            <!-- Add more objects as needed -->
+        </select>
+        <button onclick="selectObject()">Select Object</button>
+    </div>
+</body>
+</html>
