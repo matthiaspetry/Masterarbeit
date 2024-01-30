@@ -29,7 +29,7 @@ import time
 
 model_name = "efficientvit_m0.r224_in1k"  # Example model name, change as per need
 model2 = timm.create_model(model_name, pretrained=False, num_classes=2)
-state_dict2 = torch.load("/Users/matthiaspetry/Desktop/binary_classification_eff_vit.pth",map_location=torch.device('cpu'))
+state_dict2 = torch.load("/Users/matthiaspetry/Desktop/Masterarbeit/models/binary_classification_eff_vit.pth",map_location=torch.device('cpu'))
 # Assuming EfficientNet3DPosition is the class of your model
 model2.load_state_dict(state_dict2)
 model2.to("cpu")
@@ -150,9 +150,9 @@ class FastViT3DPosition(nn.Module):
         return final_output
 
 model = YOLO("yolov8s.yaml")  # build a new model from scratch
-model = YOLO("/Users/matthiaspetry/Desktop/Masterarbeit/Yolov8_best.pt") 
+model = YOLO("/Users/matthiaspetry/Desktop/Masterarbeit/models/Yolov8_best.pt") 
 
-state_dict = torch.load("/Users/matthiaspetry/Desktop/fastvit37_t8.pth",map_location=torch.device('cpu'))
+state_dict = torch.load("/Users/matthiaspetry/Desktop/Masterarbeit/models/fastvit37_t8.pth",map_location=torch.device('cpu'))
 
 #onnx_session = onnxrt.InferenceSession("/Users/matthiaspetry/Downloads/fastvit12_t8-sim.onnx")
 
@@ -215,7 +215,7 @@ log_info(gripper)
 # Parameters
 velocity = 0.1
 acceleration = 0.1
-dt = 0.5
+dt = 0.2
 lookahead_time = 0.05
 gain = 2000
 joint_q = [0.0000,-1.5708,-0.0000,-1.5708,-0.0000,0.0000]
@@ -354,8 +354,8 @@ while True:
         prev_time = current_time
     
     # Display FPS on the frame
-    #cv2.putText(frame, f"FPS: {fps}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-    #cv2.imshow('frame', frame)
+    cv2.putText(frame, f"FPS: {fps}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    cv2.imshow('frame', frame)
 
 
 
