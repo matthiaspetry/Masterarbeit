@@ -98,7 +98,7 @@ def main_processing_loop():
     model2.load_state_dict(state_dict2)
     model2.to("cpu")
     model2.eval()
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
 
@@ -249,8 +249,7 @@ def select_object():
 
 @app.route('/connect_robot', methods=['POST'])
 def connect_robot():
-    print("hi")
-    """ROBOT_IP ="192.168.188.32"
+    ROBOT_IP ="192.168.188.32"
     global rtde_c
     global rtde_r
     global gripper
@@ -267,7 +266,7 @@ def connect_robot():
     print("Connecting to gripper...")
     gripper.connect(ROBOT_IP, 63352)
     print("Activating gripper...")
-    gripper.activate()"""
+    gripper.activate()
 
 
 
@@ -276,7 +275,7 @@ def connect_robot():
 
 @app.route('/move_2_base', methods=['POST'])
 def move_2_base():
-    #rtde_c.moveJ([0.0000,-1.5708,-0.0000,-1.5708,-0.0000,0.0000])
+    rtde_c.moveJ([0.0000,-1.5708,-0.0000,-1.5708,-0.0000,0.0000])
 
     return jsonify({'message': f'Moved to base'})
 
