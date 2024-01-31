@@ -1,5 +1,7 @@
 "use client"
 import React, { useState, useEffect } from 'react';
+import { Badge,BadgeDelta } from "@tremor/react";
+
 
 const Status = () => {
   const [statusData, setStatusData] = useState({
@@ -41,43 +43,39 @@ const Status = () => {
     <div>
       <h3 className="text-lg font-semibold mb-4">Robotic Arm Status</h3>
       
-      <div className="mb-3">
+      <div className="grid grid-cols-2 gap-2">
         <span className="font-medium">Robot Arm:</span>
-        <span className={`ml-2 ${statusData.isConnected ? 'text-green-600' : 'text-red-600'}`}>
-          {statusData.isConnected ? 'Connected' : 'Disconnected'}
+        <span className="text-right">
+          {statusData.isConnected ? <Badge color="green" size="xl">Connected</Badge> : <Badge color="red" size="xl">Disconnected</Badge>}
         </span>
-      </div>
-      <div className="mb-3">
+
+      
+        
         <span className="font-medium">Gripper:</span>
-        <span className={`ml-2 ${statusData.gripperConnection ? 'text-green-600' : 'text-red-600'}`}>
-          {statusData.isConnected ? 'Connected' : 'Disconnected'}
+        <span className="text-right">
+        {statusData.gripperConnection ? <Badge color="green" size="xl">Connected</Badge> : <Badge color="red" size="xl">Disconnected</Badge>}
         </span>
-      </div>
 
-      <div className="mb-3">
         <span className="font-medium">Operational Status:</span>
-        <span className={`ml-2 ${statusData.operationalStatus ? 'text-green-600' : 'text-red-600'}`}>
-          {statusData.operationalStatus ? 'Active' : 'Inactive'}
+        <span className="text-right">
+        {statusData.operationalStatus ? <Badge color="green" size="xl">Active</Badge> : <Badge color="red" size="xl">Inactive</Badge>}
+
         </span>
-      </div>
 
-      <div className="mb-3">
         <span className="font-medium">Selected Object:</span>
-        <span className="ml-2">{statusData.currentTask}</span>
-      </div>
-
-      <div className="mb-3">
-        <span className="font-medium">Error Status:</span>
-        <span className="ml-2">{statusData.errorStatus}</span>
-      </div>
-      <div className="mb-3">
+        <span className="text-right">
+            <Badge size="xl"> {statusData.currentTask}</Badge>
+        </span>
+        
         <span className="font-medium">Object Picked:</span>
-        <span className={`ml-2 ${statusData.objectPickedUp ? 'text-green-600' : 'text-red-600'}`}>
-          {statusData.isConnected ? 'Yes' : 'No'}
+        <span className="text-right">
+          {statusData.objectPickedUp ? <Badge  size="xl">Yes</Badge> : <Badge size="xl">No</Badge>}
+
         </span>
       </div>
     </div>
   );
+
 };
 
 export default Status;

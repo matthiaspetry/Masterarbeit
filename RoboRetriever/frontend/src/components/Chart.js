@@ -2,7 +2,7 @@ import React from 'react'
 
 const Chart = () => {
   return (
-    <div>Chart</div>
+    <h3 className="text-lg font-semibold mb-4">Chart</h3>
   )
 }
 

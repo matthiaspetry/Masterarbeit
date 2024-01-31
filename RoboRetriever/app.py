@@ -322,17 +322,13 @@ def status():
     elif selected == None:
         obj = "Not Selected"
 
-
-    print("hier")
-    print(obj)
-
     data = {
         'isConnected': roboConnection,
         'gripperConnection': gripperConnection,
         'operationalStatus': is_processing_active,
         'currentTask': obj,
         'errorStatus': 'No Errors',
-        "objectPickedUp": obj
+        "objectPickedUp": objectPickedUp
         
     }
     return jsonify(data)
