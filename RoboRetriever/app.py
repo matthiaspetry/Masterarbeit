@@ -22,6 +22,10 @@ selected_object = None
 is_processing_active = False
 rtde_r = None
 rtde_c = None
+roboConnection = False
+gripperConnection = False
+objectPickedUp = False
+
 
 mean =0.4112082047842611
 std = 1.9551321360136171
@@ -98,7 +102,7 @@ def main_processing_loop():
     model2.load_state_dict(state_dict2)
     model2.to("cpu")
     model2.eval()
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
 
@@ -187,11 +191,17 @@ def main_processing_loop():
                             if grab[0] == 0 and grabcount == 3:
                                 print("Grab")
                                 gripper.move_and_wait_for_pos(255, 255, 255)
+                                global objectPickedUp 
+                                objectPickedUp = True
                                 rtde_c.servoStop()
+                                
                                     
                                 rtde_c.moveJ([-1.72233421, -1.57549443,  1.25739509, -1.22777946, -1.61194212, -0.13999015])
                                 gripper.move_and_wait_for_pos(0, 255, 255)
                                 rtde_c.moveJ(joint_q)
+
+
+
                                 grabcount = 0
                                 print(grabcount)
                                 
@@ -235,8 +245,8 @@ def start_processing():
 def stop_processing():
     global is_processing_active
     global rtde_c
-    rtde_c.servoStop()
-    rtde_c.stopScript()
+    #rtde_c.servoStop()
+    #rtde_c.stopScript()
     is_processing_active = False
     return jsonify({'message': 'Processing loop stopped'})
 
@@ -245,11 +255,12 @@ def select_object():
     global selected_object
     data = request.json
     selected_object = data.get('object_type')
+    print(selected_object)
     return jsonify({'message': f'Selected object set to {selected_object}'})
 
 @app.route('/connect_robot', methods=['POST'])
 def connect_robot():
-    ROBOT_IP ="192.168.188.32"
+    """ROBOT_IP ="192.168.188.32"
     global rtde_c
     global rtde_r
     global gripper
@@ -266,7 +277,12 @@ def connect_robot():
     print("Connecting to gripper...")
     gripper.connect(ROBOT_IP, 63352)
     print("Activating gripper...")
-    gripper.activate()
+    gripper.activate()"""
+    global roboConnection
+    roboConnection = True
+    global gripperConnection
+    gripperConnection = True
+
 
 
 
@@ -278,6 +294,48 @@ def move_2_base():
     rtde_c.moveJ([0.0000,-1.5708,-0.0000,-1.5708,-0.0000,0.0000])
 
     return jsonify({'message': f'Moved to base'})
+
+@app.route('/status')
+def status():
+    # Example data, replace with your actual data source
+    if selected_object == None:
+        selected = None
+    else:
+        selected = int(selected_object)
+
+    if selected == 0:
+        obj = "Cross"
+    elif selected == 1:
+        obj = "Cube"
+    elif selected == 2:
+        obj = "Cylinder"
+    elif selected == 3:
+        obj = "Hexagon"
+    elif selected == 4:
+        obj = "Pyramid"
+    elif selected == 5:
+        obj = "R_Cylinder"
+    elif selected == 6:
+        obj = "Star"
+    elif selected == 7:
+        obj = "Y_Cube"
+    elif selected == None:
+        obj = "Not Selected"
+
+
+    print("hier")
+    print(obj)
+
+    data = {
+        'isConnected': roboConnection,
+        'gripperConnection': gripperConnection,
+        'operationalStatus': is_processing_active,
+        'currentTask': obj,
+        'errorStatus': 'No Errors',
+        "objectPickedUp": obj
+        
+    }
+    return jsonify(data)
 
 
 @app.route('/')
