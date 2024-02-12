@@ -9,6 +9,7 @@ from torchvision import transforms
 from PIL import Image
 from rtde_control import RTDEControlInterface as RTDEControl
 from rtde_receive import RTDEReceiveInterface as RTDEReceive
+import pickle
 
 
 import sys
@@ -29,19 +30,31 @@ import time
 
 model_name = "efficientvit_m0.r224_in1k"  # Example model name, change as per need
 model2 = timm.create_model(model_name, pretrained=False, num_classes=2)
-state_dict2 = torch.load("/Users/matthiaspetry/Desktop/Masterarbeit/models/binary_classification_eff_vit.pth",map_location=torch.device('cpu'))
+state_dict2 = torch.load("/Users/matthiaspetry/Desktop/newbinary_classification.pth",map_location=torch.device('cpu'))
 # Assuming EfficientNet3DPosition is the class of your model
 model2.load_state_dict(state_dict2)
 model2.to("cpu")
 model2.eval()
 
+def init_undistortion_maps(cameraMatrix, dist, width, height):
+    newCameraMatrix, roi = cv2.getOptimalNewCameraMatrix(cameraMatrix, dist, (width, height), 1, (width, height))
+    mapx, mapy = cv2.initUndistortRectifyMap(cameraMatrix, dist, None, newCameraMatrix, (width, height), 5)
+    return mapx, mapy, roi
 
-class LayerNormFastViT3DPosition(nn.Module):
-    def __init__(self, dropout_rate=0.1, vector_input_size=4, intermediate_size=128, hidden_layer_size=64):
-        super(LayerNormFastViT3DPosition, self).__init__()
+def fast_undistort_image(img, mapx, mapy, roi):
+    dst = cv2.remap(img, mapx, mapy, cv2.INTER_LINEAR)
+    x, y, w, h = roi
+    dst = dst[y:y+h, x:x+w]
+    return dst
+
+
+class LayerNormFastViT6DPosition(nn.Module):
+    def __init__(self, dropout_rate=0.1, vector_input_size=8, intermediate_size=128, hidden_layer_size=64):
+        super(LayerNormFastViT6DPosition, self).__init__()
 
         # Load FastViT model pre-trained on ImageNet
-        self.fastvit = timm.create_model('fastvit_t8.apple_dist_in1k', pretrained=False)
+        self.fastvit = timm.create_model('fastvit_t8.apple_dist_in1k', pretrained=False) 
+        #self.fastvit = timm.create_model('efficientvit_m0.r224_in1k', pretrained=True)
         in_features = self.fastvit.get_classifier().in_features
         self.fastvit.reset_classifier(num_classes=0)  # Remove the classifier
 
@@ -152,12 +165,12 @@ class FastViT3DPosition(nn.Module):
 model = YOLO("yolov8s.yaml")  # build a new model from scratch
 model = YOLO("/Users/matthiaspetry/Desktop/Masterarbeit/models/Yolov8_best.pt") 
 
-state_dict = torch.load("/Users/matthiaspetry/Desktop/Masterarbeit/models/fastvit37_t8.pth",map_location=torch.device('cpu'))
+state_dict = torch.load("/Users/matthiaspetry/Desktop/fastvit_t8_114_2.pth",map_location=torch.device('cpu'))
 
 #onnx_session = onnxrt.InferenceSession("/Users/matthiaspetry/Downloads/fastvit12_t8-sim.onnx")
 
 # Assuming EfficientNet3DPosition is the class of your model
-joint_model = LayerNormFastViT3DPosition()
+joint_model = LayerNormFastViT6DPosition()
 # Load the state_dict into the model
 joint_model.load_state_dict(state_dict)
 
@@ -166,12 +179,12 @@ joint_model.eval()
 
 
 cap = cv2.VideoCapture(1)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
 
-mean =0.4112082047842611
-std = 1.9551321360136171
+mean = 0.43540330533546434
+std = 1.9398379424259808
 
 def reverse_standard_scaling(mean, std, scaled_data):
         original_data = [(val * std) + mean for val in scaled_data]
@@ -210,12 +223,17 @@ log_info(gripper)
 gripper.move_and_wait_for_pos(0, 255, 255)
 log_info(gripper)
 
+with open("/Users/matthiaspetry/CameraCalibration/calibration.pkl", "rb") as file:
+    cameraMatrix, dist = pickle.load(file)
+
+mapx, mapy, roi = init_undistortion_maps(cameraMatrix, dist, 1920, 1080)
+
 
 
 # Parameters
 velocity = 0.1
 acceleration = 0.1
-dt = 0.2
+dt = 0.1
 lookahead_time = 0.05
 gain = 2000
 joint_q = [0.0000,-1.5708,-0.0000,-1.5708,-0.0000,0.0000]
@@ -223,7 +241,7 @@ joint_q = [0.0000,-1.5708,-0.0000,-1.5708,-0.0000,0.0000]
 # Move to initial joint position with a regular moveJ
 rtde_c.moveJ(joint_q)
 
-counter = 679 
+counter = 2772
 
 
 if not cap.isOpened():
@@ -237,12 +255,14 @@ while True:
     # Capture frame-by-frame
     ret, frame = cap.read()
 
+    dst = fast_undistort_image(frame, mapx, mapy, roi)
+
 
     # if frame is read correctly ret is True
     if not ret:
         print("Can't receive frame (stream end?). Exiting ...")
         break
-    resized_frame = cv2.resize(frame, (512,288))
+    resized_frame = cv2.resize(dst, (512,288))
     results = model.predict(resized_frame, verbose=False, imgsz=512)
     object_detected = False
     start_time_loop = time.time()
@@ -252,7 +272,7 @@ while True:
         classes = result.boxes.cls.tolist()
 
         for i, cls in enumerate(classes):
-            if cls == 7:
+            if cls == 3:
 
 
     
@@ -266,7 +286,17 @@ while True:
                 # Draw rectangle
                 #cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)  # Green box
 
-                bbox_tensor = torch.tensor([xn, yn, wn, hn]).unsqueeze(0)   
+                bbox_tensor = torch.tensor([xn, yn, wn, hn])
+
+                x1 = xn - (wn / 2)
+                y1 = yn - (hn / 2)
+                x2 = xn + (wn / 2)
+                y2 = yn + (hn / 2)
+
+                # Create the bounding box in xyxyn format
+                bbox_xyxyn = torch.tensor([x1, y1, x2, y2], dtype=torch.float32)
+
+                bboxs = torch.cat((bbox_tensor, bbox_xyxyn), 0).unsqueeze(0)
 
                 # Open the image with PIL
                 start_process = time.time()
@@ -274,7 +304,7 @@ while True:
                 target_size2 = (256, 256)
 
                 # Convert PIL Image to NumPy array for OpenCV processing
-                frame_np = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frame_np = cv2.cvtColor(dst, cv2.COLOR_BGR2RGB)
                 # Start the timer for resizing
                 resizedframe = cv2.resize(frame_np, target_size2)
                 # Convert back to PIL Image for further processing
@@ -309,7 +339,7 @@ while True:
                 with torch.no_grad():
                     
                     start_time = time.time()  # Start timing for EfficientNet
-                    outputs = joint_model(img_batched, bbox_tensor)
+                    outputs = joint_model(img_batched, bboxs)
                     
                    
                     jp = reverse_standard_scaling(mean,std,outputs.numpy())[0]
@@ -331,13 +361,12 @@ while True:
                         print(grabcount)
                         
                     else:
-                        gripper.move_and_wait_for_pos(0, 255, 255)   
+                        gripper.move_and_wait_for_pos(0, 255, 255)  
 
                     
 
-                    #cv2.imwrite(f'Gripper/image{counter}.png', framex)
+                    #cv2.imwrite(f'Gripper/image{counter}.jpg', frame)
                     #counter += 1
-                    
 
 
 
@@ -354,8 +383,8 @@ while True:
         prev_time = current_time
     
     # Display FPS on the frame
-    cv2.putText(frame, f"FPS: {fps}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-    cv2.imshow('frame', frame)
+    cv2.putText(resized_frame, f"FPS: {fps}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    cv2.imshow('frame', resized_frame)
 
 
 

@@ -49,8 +49,19 @@ def custom_preprocess(image_path, width, height):
     return img_batched
 
 
-mean = 0.4112082047842611 #0.2891893974394957 
-std = 1.9551321360136171 #1.9843475932292247 
+"""mean = 0.4272211200448766 #0.2891893974394957 
+std = 1.9514025672861495 #1.9843475932292247 """
+
+
+
+"""mean =0.4384397828040158 #0.2891893974394957 
+std = 1.9455521154556288 #1.9843475932292247 """
+
+
+mean =0.4353692998265719
+std = 1.9398368097425458
+
+
 
 def reverse_standard_scaling(mean, std, scaled_data):
         original_data = [(val * std) + mean for val in scaled_data]
@@ -484,7 +495,7 @@ def annotate_and_save_images(class_to_annotate, positions_file, object, model, m
 
                         img_batched = img_normalized.unsqueeze(0)
 
-                        resized_image2 = cv2.resize(img_np, (106,106))
+                        resized_image2 = cv2.resize(img_np, (224,224))
                        
 
                         # Convert back to PIL Image for further processing
@@ -521,7 +532,7 @@ def annotate_and_save_images(class_to_annotate, positions_file, object, model, m
                             net_time = time.time() - start_time
                             net += net_time
 
-                            print(torch.argmax(pred, dim=1).numpy())
+                            #print(torch.argmax(pred, dim=1).numpy())
                             y_pred.append(jp)
                             y_true.append(ground_truth)
             end_time_loop = time.time() - start_time_loop
@@ -551,17 +562,18 @@ def annotate_and_save_images(class_to_annotate, positions_file, object, model, m
 
 if __name__ == "__main__":
     model = YOLO("yolov8s.yaml")  # build a new model from scratch
-    model = YOLO("/Users/matthiaspetry/Desktop/Masterarbeit/Yolov8_best.pt") 
+    model = YOLO("/Users/matthiaspetry/Desktop/Masterarbeit/models/Yolov8_best.pt") 
 
 
     #state_dict = torch.load("/Users/matthiaspetry/Desktop/efficientvit_m0_r224_in1k26_1.pth",map_location=torch.device('cpu'))
-    state_dict = torch.load("/Users/matthiaspetry/Desktop/fastvit37_t8.pth",map_location=torch.device('cpu'))
+    state_dict = torch.load("/Users/matthiaspetry/Desktop/fastvit_t8_129_1.pth",map_location=torch.device('cpu'))
+    #state_dict = torch.load("/Users/matthiaspetry/Desktop/model_131.pth",map_location=torch.device('cpu'))
     #onnx_session = onnxrt.InferenceSession("/Users/matthiaspetry/Downloads/fastvit12_t8-sim.onnx")
     #model_name = "efficientnet_b0.ra_in1k"  # Example model name, change as per need
     #efficientvit_m0.r224_in1k tinynet_e.in1k
-    model_name = "tinynet_e.in1k"  # Example model name, change as per need
+    model_name = "efficientvit_m0.r224_in1k"  # Example model name, change as per need
     model2 = timm.create_model(model_name, pretrained=False, num_classes=2)
-    state_dict2 = torch.load("/Users/matthiaspetry/Desktop/binary_classification_tiny.pth",map_location=torch.device('cpu')) #efficientvit_m0.r224_in1k
+    state_dict2 = torch.load("models/binary_classification_eff_vit.pth",map_location=torch.device('cpu')) #efficientvit_m0.r224_in1k
     #state_dict2 = torch.load("/Users/matthiaspetry/Desktop/binary_classification_eff_vit.pth",map_location=torch.device('cpu')) #efficientvit_m0.r224_in1k
     # Assuming EfficientNet3DPosition is the class of your model
     model2.load_state_dict(state_dict2)
@@ -576,16 +588,18 @@ if __name__ == "__main__":
     model_Efficient_Net.eval()
     def mean_time_execution():
         total_time = 0
-        number_of_runs = 3
+        number_of_runs = 1
 
         for _ in range(number_of_runs):
             start_time = time.time()
             
             # Your function calls
-            annotate_and_save_images(4, "/Users/matthiaspetry/Desktop/Masterarbeit/new_data_w_multiple_objects/testdata/Pyramid_640x360/positions.txt", "Pyramid", model, model_Efficient_Net, model2)
-            annotate_and_save_images(1, "/Users/matthiaspetry/Desktop/Masterarbeit/new_data_w_multiple_objects/testdata/Cube_640x360/positions.txt", "Cube", model, model_Efficient_Net,model2)
-            annotate_and_save_images(3, "/Users/matthiaspetry/Desktop/Masterarbeit/new_data_w_multiple_objects/testdata/Hexagon_640x360/positions.txt", "Hexagon", model, model_Efficient_Net,model2)
-            annotate_and_save_images(7, "/Users/matthiaspetry/Desktop/Masterarbeit/new_data_w_multiple_objects/testdata/Y_Cube_640x360/positions.txt", "Y_Cube", model, model_Efficient_Net,model2)
+            annotate_and_save_images(4, "/Users/matthiaspetry/Desktop/Masterarbeit/more_objects6/Cali_Pyramid_640x360/Pyramid_positions.txt", "Pyramid", model, model_Efficient_Net, model2)
+            annotate_and_save_images(2, "/Users/matthiaspetry/Desktop/Masterarbeit/more_objects6/Cali_Cylinder_640x360/Cylinder_positions.txt", "Cylinder", model, model_Efficient_Net, model2)
+            annotate_and_save_images(0, "/Users/matthiaspetry/Desktop/Masterarbeit/more_objects6/Cali_Cross_640x360/Cross_positions.txt", "Cross", model, model_Efficient_Net, model2)
+            annotate_and_save_images(1, "/Users/matthiaspetry/Desktop/Masterarbeit/more_objects6/Cali_Cube_640x360/Cube_positions.txt", "Cube", model, model_Efficient_Net,model2)
+            annotate_and_save_images(3, "/Users/matthiaspetry/Desktop/Masterarbeit/more_objects6/Cali_Hexagon_640x360/Hexagon_positions.txt", "Hexagon", model, model_Efficient_Net,model2)
+            annotate_and_save_images(7, "/Users/matthiaspetry/Desktop/Masterarbeit/more_objects6/Cali_Y_Cube_640x360/Y_Cube_positions.txt", "Y_Cube", model, model_Efficient_Net,model2)
 
             total_time += (time.time() - start_time)
 
