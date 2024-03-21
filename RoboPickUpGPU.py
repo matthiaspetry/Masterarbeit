@@ -45,8 +45,55 @@ model2.load_state_dict(state_dict2)
 model2.to("cuda")
 model2.eval()
 
-# ... (existing code for undistortion functions and LayerNormFastViT6DPosition class)
+class LayerNormFastViT6DPosition(nn.Module):
+    def __init__(self, dropout_rate=0.1, vector_input_size=8, intermediate_size=128, hidden_layer_size=64):
+        super(LayerNormFastViT6DPosition, self).__init__()
 
+        # Load FastViT model pre-trained on ImageNet
+        self.fastvit = timm.create_model('fastvit_t8.apple_dist_in1k', pretrained=False) 
+        #self.fastvit = timm.create_model('resnet18.a1_in1k', pretrained=False)
+
+        in_features = self.fastvit.get_classifier().in_features
+        self.fastvit.reset_classifier(num_classes=0)  # Remove the classifier
+
+        # Model for processing 4D vector input with LayerNorm
+        self.vector_model = nn.Sequential(
+            nn.Linear(vector_input_size, intermediate_size),
+            nn.ReLU(),
+            nn.LayerNorm(intermediate_size),
+            nn.Linear(intermediate_size, in_features),
+            nn.ReLU(),
+            nn.LayerNorm(in_features),
+            nn.Dropout(dropout_rate)
+        )
+
+        # Enhanced combined output layer with LayerNorm
+        self.combined_output_layer = nn.Sequential(
+            nn.Linear(in_features * 2, hidden_layer_size),
+            nn.ReLU(),
+            nn.LayerNorm(hidden_layer_size),
+            nn.Dropout(dropout_rate),
+            nn.Linear(hidden_layer_size, hidden_layer_size),
+            nn.ReLU(),
+            nn.LayerNorm(hidden_layer_size),
+            nn.Linear(hidden_layer_size, 6)
+        )
+
+    def forward(self, x, vector):
+        # Extract features using FastViT
+        fastvit_features = self.fastvit(x)
+
+        # Process the 4D vector through the vector model
+        vector_features = self.vector_model(vector)
+
+        # Concatenate FastViT and vector features
+        concatenated_features = torch.cat((fastvit_features, vector_features), dim=1)
+
+        # Final output layer for regression
+        final_output = self.combined_output_layer(concatenated_features)
+
+        return final_output
+        
 model = YOLO("yolov8s.yaml")
 model = YOLO("/home/localedge2/Masterarbeit/models/best223.pt")
 model.to("cuda")
