@@ -356,7 +356,7 @@ while True:
                             position[1] -= 10 * (math.pi / 180)
                             rtde_c.servoStop()
                             rtde_c.moveJ(position,3,3)
-                            del position
+                            torch.cuda.empty_cache()
                             
                             detected = False
                             startTime = None
@@ -365,8 +365,9 @@ while True:
                             rtde_c.moveJ(joint_q,3,3)
                             grabcount = 0
                             addcount = 1
-                           
+                            time.sleep(5) 
                             #print(grabcount)
+                            torch.cuda.empty_cache()
                             
                         else:
                             gripper.move_and_wait_for_pos(0, 255, 255)  
