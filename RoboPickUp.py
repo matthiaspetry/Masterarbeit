@@ -10,6 +10,10 @@ from PIL import Image
 from rtde_control import RTDEControlInterface as RTDEControl
 from rtde_receive import RTDEReceiveInterface as RTDEReceive
 import pickle
+import math
+import roboticstoolbox as rtb
+import numpy as np
+import keyboard
 
 
 import sys
@@ -19,7 +23,7 @@ folders_to_add = [
     '/Users/matthiaspetry/Desktop/Masterarbeit/robotiq_gripper/',
 ]
 
-
+import glob
 
 for folder in folders_to_add:
     sys.path.append(folder)
@@ -27,10 +31,22 @@ for folder in folders_to_add:
 import robotiq_gripper
 import time
 
+dh_params = np.array([
+    [0, 0.15185,       0,   np.pi/2],
+    [0, 0,      -0.24355,         0],
+    [0, 0,       -0.2132,         0],
+    [0, 0.13105,       0,   np.pi/2],
+    [0, 0.08535,       0,  -np.pi/2],
+    [0, 0.0921,        0,         0]
+])
 
-model_name = "efficientvit_m0.r224_in1k"  # Example model name, change as per need
+robot = rtb.DHRobot([
+    rtb.RevoluteDH(d=dh_params[i, 1], a=dh_params[i, 2], alpha=dh_params[i, 3]) for i in range(6)
+], name='UR3e')
+
+model_name = "resnet10t.c3_in1k"  # Example model name, change as per need
 model2 = timm.create_model(model_name, pretrained=False, num_classes=2)
-state_dict2 = torch.load("/Users/matthiaspetry/Desktop/newbinary_classification.pth",map_location=torch.device('cpu'))
+state_dict2 = torch.load("/Users/matthiaspetry/Desktop/Masterarbeit/DesicionModel.pth",map_location=torch.device('cpu'))
 # Assuming EfficientNet3DPosition is the class of your model
 model2.load_state_dict(state_dict2)
 model2.to("cpu")
@@ -48,13 +64,15 @@ def fast_undistort_image(img, mapx, mapy, roi):
     return dst
 
 
+
 class LayerNormFastViT6DPosition(nn.Module):
     def __init__(self, dropout_rate=0.1, vector_input_size=8, intermediate_size=128, hidden_layer_size=64):
         super(LayerNormFastViT6DPosition, self).__init__()
 
         # Load FastViT model pre-trained on ImageNet
         self.fastvit = timm.create_model('fastvit_t8.apple_dist_in1k', pretrained=False) 
-        #self.fastvit = timm.create_model('efficientvit_m0.r224_in1k', pretrained=True)
+        #self.fastvit = timm.create_model('resnet18.a1_in1k', pretrained=False)
+
         in_features = self.fastvit.get_classifier().in_features
         self.fastvit.reset_classifier(num_classes=0)  # Remove the classifier
 
@@ -99,75 +117,11 @@ class LayerNormFastViT6DPosition(nn.Module):
 
 
 
-class FastViT3DPosition(nn.Module):
-    def __init__(self, dropout_rate=0.2):  # Reduced dropout rate
-        super(FastViT3DPosition, self).__init__()
-        # Load FastViT model pre-trained on ImageNet
-        self.fastvit = timm.create_model('fastvit_sa12.apple_dist_in1k', pretrained=False)
-
-        # Model for 4D vector input
-        self.vector_model = nn.Sequential(
-            nn.Linear(4, 32),
-            nn.LeakyReLU(),
-            nn.BatchNorm1d(32),
-            nn.Linear(32, 64),
-            nn.LeakyReLU(),
-            nn.BatchNorm1d(64),
-            nn.Dropout(dropout_rate),  # Applying dropout less frequently
-            nn.Linear(64, 128),
-            nn.LeakyReLU(),
-            nn.BatchNorm1d(128),
-            nn.Linear(128, 256),
-            nn.LeakyReLU(),
-            nn.BatchNorm1d(256),
-            nn.Dropout(dropout_rate),
-            nn.Linear(256, 128),
-            nn.LeakyReLU(),
-            nn.BatchNorm1d(128),
-            nn.Linear(128, 64),
-            nn.LeakyReLU(),
-            nn.BatchNorm1d(64),
-            nn.Dropout(dropout_rate),
-            nn.Linear(64, 32),
-            nn.LeakyReLU(),
-            nn.BatchNorm1d(32),
-            nn.Linear(32, 6)
-        )
-
-        # Replace the original classifier in FastViT for regression
-        in_features = self.fastvit.get_classifier().in_features
-        self.fastvit.reset_classifier(num_classes=0)  # Remove the classifier
-        self.fastvit_output_layer = nn.Linear(in_features, 6)  # New output layer for regression
-        
-        # Additional layer to combine outputs and produce a 6D vector
-        self.combined_fc = nn.Linear(12, 6)
-
-    def forward(self, x, vector):
-        # Pass input through FastViT model
-        features = self.fastvit(x)
-        fastvit_output = self.fastvit_output_layer(features)
-
-        # Normalize the 4D vector input
-        vector_norm = torch.norm(vector, p=2, dim=1, keepdim=True)
-        vector_normalized = vector / vector_norm
-
-        # Pass 4D vector through second model
-        vector_output = self.vector_model(vector_normalized)
-
-        # Concatenate FastViT and vector outputs
-        concatenated_output = torch.cat((fastvit_output, vector_output), dim=1)
-
-        # Final layer to get a 6D vector for regression
-        final_output = self.combined_fc(concatenated_output)
-
-        return final_output
 
 model = YOLO("yolov8s.yaml")  # build a new model from scratch
-model = YOLO("/Users/matthiaspetry/Desktop/Masterarbeit/models/Yolov8_best.pt") 
+model = YOLO("/Users/matthiaspetry/Desktop/kaggle 5/working/runs/detect/train/weights/best223.pt") 
 
-state_dict = torch.load("/Users/matthiaspetry/Desktop/fastvit_t8_114_2.pth",map_location=torch.device('cpu'))
-
-#onnx_session = onnxrt.InferenceSession("/Users/matthiaspetry/Downloads/fastvit12_t8-sim.onnx")
+state_dict = torch.load("/Users/matthiaspetry/Desktop/T8_86_145.pth",map_location=torch.device('cpu'))
 
 # Assuming EfficientNet3DPosition is the class of your model
 joint_model = LayerNormFastViT6DPosition()
@@ -177,14 +131,15 @@ joint_model.load_state_dict(state_dict)
 joint_model.to("cpu")
 joint_model.eval()
 
+cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
 
-cap = cv2.VideoCapture(1)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+#mean = -0.015857931462808714 # T8_201_141
+# std = 1.479495674591031
 
-
-mean = 0.43540330533546434
-std = 1.9398379424259808
+mean = -0.02049437658091184
+std = 1.4781722524455945
 
 def reverse_standard_scaling(mean, std, scaled_data):
         original_data = [(val * std) + mean for val in scaled_data]
@@ -194,11 +149,6 @@ fps_counter = 0
 fps = 0
 prev_time = time.time()
 
-
-#robot = robot_init(host)
-
-#robot.init_realtime_control()  # starts the realtime control loop on the Universal-Robot Controller
-time.sleep(1) # just a short wait to make sure everything is initialised"""
 
 ROBOT_IP ="192.168.188.32"
 
@@ -223,25 +173,22 @@ log_info(gripper)
 gripper.move_and_wait_for_pos(0, 255, 255)
 log_info(gripper)
 
-with open("/Users/matthiaspetry/CameraCalibration/calibration.pkl", "rb") as file:
+with open("/Users/matthiaspetry/Desktop/Masterarbeit/calibration.pkl", "rb") as file:
     cameraMatrix, dist = pickle.load(file)
 
 mapx, mapy, roi = init_undistortion_maps(cameraMatrix, dist, 1920, 1080)
 
-
-
 # Parameters
-velocity = 0.1
-acceleration = 0.1
+velocity = 3
+acceleration = 3
 dt = 0.1
-lookahead_time = 0.05
+lookahead_time = 0.2
 gain = 2000
 joint_q = [0.0000,-1.5708,-0.0000,-1.5708,-0.0000,0.0000]
 
-# Move to initial joint position with a regular moveJ
 rtde_c.moveJ(joint_q)
 
-counter = 2772
+counter = 174
 
 
 if not cap.isOpened():
@@ -249,30 +196,53 @@ if not cap.isOpened():
     exit() 
 
 grabcount = 0
+
+addcount = 1
+detected = False
+startTime = None
+released = False
+
+sequnce = []
 while True:
     t_start = rtde_c.initPeriod()
     
     # Capture frame-by-frame
     ret, frame = cap.read()
 
-    dst = fast_undistort_image(frame, mapx, mapy, roi)
+    #dst = fast_undistort_image(frame, mapx, mapy, roi)
+
+    if rtde_r.isProtectiveStopped():
+        print("Protective Stop")
 
 
     # if frame is read correctly ret is True
     if not ret:
         print("Can't receive frame (stream end?). Exiting ...")
         break
-    resized_frame = cv2.resize(dst, (512,288))
-    results = model.predict(resized_frame, verbose=False, imgsz=512)
+    resized_frame = cv2.resize(frame, (512,288))
+    results = model.predict(resized_frame, verbose=True, imgsz=512)
     object_detected = False
     start_time_loop = time.time()
+   
     
+
+
+
+
     for result in results:
+        print(result.boxes.conf)
+        print(result.boxes.cls)
         boxes = result.boxes.xywhn.tolist()
         classes = result.boxes.cls.tolist()
 
+        
+        
+
         for i, cls in enumerate(classes):
-            if cls == 3:
+            if detected == False:
+                detected = True
+                startTime = time.time()
+            if cls == 1: #or cls == 1 or cls == 2:
 
 
     
@@ -280,11 +250,6 @@ while True:
 
                 xn, yn, wn, hn = boxes[i]
 
-                # Convert normalized coordinates to pixel coordinates
-                #x, y, w, h = int(xn * frame.shape[1]), int(yn * frame.shape[0]), int(wn * frame.shape[1]), int(hn * frame.shape[0])
-
-                # Draw rectangle
-                #cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)  # Green box
 
                 bbox_tensor = torch.tensor([xn, yn, wn, hn])
 
@@ -304,7 +269,8 @@ while True:
                 target_size2 = (256, 256)
 
                 # Convert PIL Image to NumPy array for OpenCV processing
-                frame_np = cv2.cvtColor(dst, cv2.COLOR_BGR2RGB)
+                #frame_np = cv2.cvtColor(dst, cv2.COLOR_BGR2RGB)
+                frame_np = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 # Start the timer for resizing
                 resizedframe = cv2.resize(frame_np, target_size2)
                 # Convert back to PIL Image for further processing
@@ -318,7 +284,7 @@ while True:
                 img_batched = img_normalized.unsqueeze(0)
 
                 resized_image2 = cv2.resize(frame_np, (224,224))
-                       
+                    
 
                 # Convert back to PIL Image for further processing
                 img_pil2 = Image.fromarray(resized_image2)
@@ -330,48 +296,101 @@ while True:
                     
 
                 # Start the timer for normalization
-                       
                 img_normalized2 = normalize(img_tensor2)
                         
 
                 img_batched2 = img_normalized2.unsqueeze(0)
 
                 with torch.no_grad():
-                    
-                    start_time = time.time()  # Start timing for EfficientNet
+                
                     outputs = joint_model(img_batched, bboxs)
                     
-                   
-                    jp = reverse_standard_scaling(mean,std,outputs.numpy())[0]
-                    rtde_c.servoJ(jp, velocity, acceleration, dt, lookahead_time, gain)
-                    pred = model2(img_batched2)
-                    grab = torch.argmax(pred, dim=1).numpy()
-                    if grab[0] == 0:
-                        
-                        grabcount += 1
-                    if grab[0] == 0 and grabcount == 3:
-                        print("Grab")
-                        gripper.move_and_wait_for_pos(255, 255, 255)
-                        rtde_c.servoStop()
-                            
-                        rtde_c.moveJ([-1.72233421, -1.57549443,  1.25739509, -1.22777946, -1.61194212, -0.13999015])
-                        gripper.move_and_wait_for_pos(0, 255, 255)
-                        rtde_c.moveJ(joint_q)
-                        grabcount = 0
-                        print(grabcount)
-                        
-                    else:
-                        gripper.move_and_wait_for_pos(0, 255, 255)  
+                    jp = reverse_standard_scaling(mean, std, outputs.numpy())[0]
 
+                    end_effector_pose = robot.fkine(jp)
+
+                    current_position = rtde_r.getActualQ()
+
+
+                    if end_effector_pose.t[2] > 0.50:
                     
+                        a = rtb.mtraj(rtb.quintic, current_position, jp, 50)
+                        #a = rtb.jtraj( current_position, jp, 10)
+                        for position in a.q:                       
+                            rtde_c.servoJ(position, velocity, acceleration, dt, lookahead_time, gain)
+                    else: 
+                    
+                        end_effector_pose.t[0] = end_effector_pose.t[0] - (4* 0.01)
+                        end_effector_pose.t[1] = end_effector_pose.t[1] 
+                        
+                        sol = robot.ikine_LM(end_effector_pose,jp)
+                        jp = sol.q
+                        
+                        
+                        rtde_c.servoJ(jp, velocity, acceleration, dt, lookahead_time, gain)
+                            
 
-                    #cv2.imwrite(f'Gripper/image{counter}.jpg', frame)
-                    #counter += 1
+                        pred = model2(img_batched2)
+                        grab = torch.argmax(pred, dim=1).numpy()
+                        if grab[0] == 0:
+                            print(grabcount)
+                            grabcount += 1
+                        if grab[0] == 0 and grabcount == 2:
+                            
+                            print("Grab")
+                            gripper.move_and_wait_for_pos(255, 255, 255)
+                            
+                            
+                            
+                            
+                            
+                            
+                            position = rtde_r.getActualQ()
+                            print(f"Position : {position}")
+                            pickuptime = time.time() - startTime
+                            print(f"Dynamic Time: {pickuptime}")
+                            rounded_position = [round(p, 4) for p in position]
+                            #with open("/Users/matthiaspetry/Desktop/Masterarbeit/Y_CubeDynamicEvaluation4mMultiple.txt", 'a') as text_file:
+                                #positions_str1 = f"Position {counter}: "
+                                #positions_str2 = ",".join(map(str, rounded_position))
+                                #text_file.write(positions_str1 + positions_str2 +","+str(pickuptime) + "\n")
+                                #counter += 1
+                           
+                            position[1] -= 10 * (math.pi / 180)
+                            rtde_c.servoStop()
+                            rtde_c.moveJ(position,3,3)
+                            del position
+                            
+                            detected = False
+                            startTime = None
+                            rtde_c.moveJ([-1.72233421, -1.57549443,  1.25739509, -1.22777946, -1.61194212, -0.13999015],3,3)
+                            gripper.move_and_wait_for_pos(0, 255, 255)
+                            rtde_c.moveJ(joint_q,3,3)
+                            grabcount = 0
+                            addcount = 1
+                           
+                            #print(grabcount)
+                            
+                        else:
+                            gripper.move_and_wait_for_pos(0, 255, 255)  
+
+                        
+
+                        cv2.imwrite(f'Gripper/image{counter}.jpg', frame)
+                        counter += 1
 
 
 
-                   
-                    rtde_c.waitPeriod(t_start)
+                        
+                        rtde_c.waitPeriod(t_start)
+
+    if keyboard.is_pressed('q'):
+        
+        rtde_c.servoStop()
+        rtde_c.moveJ(joint_q,3,3)
+        released = False
+
+            
 
 
     # FPS Calculation

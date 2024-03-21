@@ -19,13 +19,17 @@ const Status = () => {
         const response = await fetch(apiUrl);
         const data = await response.json();
 
+        console.log( data.objectPlacePosition)
+
         setStatusData({
           isConnected: data.isConnected,
           gripperConnection: data.gripperConnection,
           operationalStatus: data.operationalStatus,
           currentTask: data.currentTask,
           errorStatus: data.errorStatus,
-          objectPickedUp: data.objectPickedUp
+          objectPickedUp: data.objectPickedUp,
+          selectedSpeed: data.selectedSpeed,
+          selectedModel: data.selectedModel
         });
       } catch (error) {
         console.error('Error fetching data: ', error);
@@ -58,8 +62,12 @@ const Status = () => {
 
         <span className="font-medium">Operational Status:</span>
         <span className="text-right">
-        {statusData.operationalStatus ? <Badge color="green" size="xl">Active</Badge> : <Badge color="red" size="xl">Inactive</Badge>}
-
+            {statusData.operationalStatus === 'FreeDrive' ? 
+                <Badge color="blue" size="xl">Free Drive</Badge> :
+                statusData.operationalStatus ? 
+                    <Badge color="green" size="xl">Active</Badge> : 
+                    <Badge color="red" size="xl">Inactive</Badge>
+            }
         </span>
 
         <span className="font-medium">Selected Object:</span>
@@ -72,6 +80,19 @@ const Status = () => {
           {statusData.objectPickedUp ? <Badge  size="xl">Yes</Badge> : <Badge size="xl">No</Badge>}
 
         </span>
+
+        <span className="font-medium">Conveyor Speed:</span>
+        <span className="text-right">
+        <Badge size="xl"> {statusData.selectedSpeed}</Badge>
+
+        </span>
+        <span className="font-medium">Model:</span>
+        <span className="text-right">
+        <Badge size="xl"> {statusData.selectedModel}</Badge>
+
+        </span>
+
+  
       </div>
     </div>
   );
