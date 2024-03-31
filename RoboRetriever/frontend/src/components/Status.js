@@ -48,7 +48,7 @@ const Status = () => {
     };
 
     // Call fetchData every 1000 milliseconds (1 second)
-    const intervalId = setInterval(fetchData, 1000);
+    const intervalId = setInterval(fetchData, 5000);
 
     // Cleanup interval on component unmount
     return () => clearInterval(intervalId);
