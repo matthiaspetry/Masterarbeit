@@ -1,9 +1,21 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import UrlContext from '../UrlContext';
+import DynamicContext from './DynamicContext';
+
+
 import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart ,Bar,Rectangle,ResponsiveContainer,Cell} from 'recharts';
 
 const Chart = () => {
+  const url = useContext(UrlContext);
+  const { isDynamic } = useContext(DynamicContext);
+
+
+
+
+
   const [activeTab, setActiveTab] = useState(0);
+  const [barData, setBarData] = useState([]);
   const [lineChartData, setLineChartData] = useState([]);
   const [scatterChartData, setScatterChartData] = useState([]);
   const [lastLineDataPoint, setLastLineDataPoint] = useState(null);
@@ -13,44 +25,8 @@ const Chart = () => {
     { x: 0, y: 0 },
   ];
 
-  const data = [
-    {
-      name: 'Cross',
-      Count: 20,
-    },
-    {
-      name: 'Cube',
-      Count: 31,
-    },
-    {
-      name: 'Hexagon',
-      Count: 12,
-   
-    },
-    {
-      name: 'Cylinder',
-      Count: 5,
-      
-    },
-    {
-      name: 'Pyramid',
-      Count: 18,
-      
-    },
-    {
-      name: 'Star',
-      Count: 3,
-     
-    },
-    {
-      name: 'Y_Cube',
-      Count: 23,
-     
-    },
-    
-  ];
 
-  const colors = ['#ff7f50', '#ff2717', '#0069e3', '#6c5ce7', '#82ca9d', '#ffff00',"#ffc658"];
+  const colors = ['#ff7f50', '#ff2717', '#0069e3', '#6c5ce7', '#82ca9d',"#ffc658"];
 
 const getColor = (index) => {
   return colors[index % colors.length];
@@ -63,11 +39,18 @@ const getColor = (index) => {
   };
 
   useEffect(() => {
+
+    console.log("Chart:" + isDynamic)
+    console.log(scatterChartData)
+
+
     const fetchData = async () => {
       try {
         const lineDataResponse = await fetchLineChartData(); // Fetch line chart data from backend
+        const barDataResponse = await fetchBarChartData(); // Fetch line chart data from backend
         const scatterDataResponse = await fetchScatterChartData(); // Fetch scatter plot data from backend
         console.log(lineDataResponse)
+        console.log(barDataResponse)
         console.log(scatterDataResponse)
        
   
@@ -78,7 +61,13 @@ const getColor = (index) => {
           setLastLineDataPoint(lineDataResponse);
         }
 
-  
+
+        // Update bar chart data
+          if (barDataResponse && barDataResponse !== barData) {
+            console.log(barDataResponse)
+            setBarData(barDataResponse);
+          }
+
         // Update scatter plot data (check for empty response)
         if (scatterDataResponse && !isDataEqual(lastScatterDataPoint, scatterDataResponse)) {
           setScatterChartData(prevData => [...prevData, scatterDataResponse]);
@@ -90,12 +79,17 @@ const getColor = (index) => {
     };
 
     const fetchLineChartData = async () => {
-      const response = await fetch('http://127.0.0.1:5000/dataTime'); // Fetch line chart data from backend
+      const response = await fetch(url +'/dataTime'); // Fetch line chart data from backend
+      return await response.json();
+    };
+
+    const fetchBarChartData = async () => {
+      const response = await fetch(url +'/dataCount'); // Fetch line chart data from backend
       return await response.json();
     };
 
     const fetchScatterChartData = async () => {
-      const response = await fetch('http://127.0.0.1:5000/dataPosition'); // Fetch scatter plot data from backend
+      const response = await fetch(url +'/dataPosition'); // Fetch scatter plot data from backend
       return await response.json();
     };
 
@@ -106,12 +100,12 @@ const getColor = (index) => {
 
     const intervalId = setInterval(fetchData, 5000); // Fetch data every second
     return () => clearInterval(intervalId); // Cleanup interval on component unmount
-  }, [lineChartData, scatterChartData]);
+  }, [lineChartData, scatterChartData,url,isDynamic]);
 
   return (
     <div className="flex">
       <div className="flex flex-col p-4">
-        <div className="text-lg font-semibold mb-4">Charts</div>
+        <div className="text-xl font-semibold mb-4">Charts</div>
         <button className={activeTab === 0 ? "tab tab-active" : "tab"} onClick={() => handleTabClick(0)}>Pick-up Time</button>
         <button className={activeTab === 1 ? "tab tab-active" : "tab"} onClick={() => handleTabClick(1)}>Pick-up Location</button>
         <button className={activeTab === 2 ? "tab tab-active" : "tab"} onClick={() => handleTabClick(2)}>Object Count</button>
@@ -169,9 +163,11 @@ const getColor = (index) => {
         {activeTab === 2 && (
           <div>
             <h3 className="text-lg font-semibold mb-4">Object Count</h3>
+
+            {scatterChartData.length > 0 && (
             <BarChart
             width={1000} height={580} 
-          data={data}
+          data={barData}
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="name" />
@@ -180,16 +176,21 @@ const getColor = (index) => {
           <Legend />
           <Bar
             dataKey="Count"    >
-            {data.map((entry, index) => (
+            {barData.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
                 fill={getColor(index)}
                 stroke={getColor(index)}
               />
             ))}
+            
           </Bar>
           
         </BarChart>
+        )}
+        {scatterChartData.length === 0 && (  // Display message if no data
+              <p>No data available.</p>
+            )}
           </div>
         )}
       </div>

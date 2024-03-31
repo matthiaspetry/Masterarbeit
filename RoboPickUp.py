@@ -46,7 +46,7 @@ robot = rtb.DHRobot([
 
 model_name = "resnet10t.c3_in1k"  # Example model name, change as per need
 model2 = timm.create_model(model_name, pretrained=False, num_classes=2)
-state_dict2 = torch.load("/Users/matthiaspetry/Desktop/Masterarbeit/DesicionModel.pth",map_location=torch.device('cpu'))
+state_dict2 = torch.load("/Users/matthiaspetry/Desktop/kaggle 6/working/binary_classification.pth",map_location=torch.device('cpu'))
 # Assuming EfficientNet3DPosition is the class of your model
 model2.load_state_dict(state_dict2)
 model2.to("cpu")
@@ -119,9 +119,9 @@ class LayerNormFastViT6DPosition(nn.Module):
 
 
 model = YOLO("yolov8s.yaml")  # build a new model from scratch
-model = YOLO("/Users/matthiaspetry/Desktop/kaggle 5/working/runs/detect/train/weights/best223.pt") 
+model = YOLO("/Users/matthiaspetry/Desktop/kaggle 7/working/runs/detect/train/weights/best.pt") 
 
-state_dict = torch.load("/Users/matthiaspetry/Desktop/T8_86_145.pth",map_location=torch.device('cpu'))
+state_dict = torch.load("/Users/matthiaspetry/Desktop/Masterarbeit/models/T8_86_145.pth",map_location=torch.device('cpu'))
 
 # Assuming EfficientNet3DPosition is the class of your model
 joint_model = LayerNormFastViT6DPosition()
@@ -188,7 +188,7 @@ joint_q = [0.0000,-1.5708,-0.0000,-1.5708,-0.0000,0.0000]
 
 rtde_c.moveJ(joint_q)
 
-counter = 174
+counter = 9777
 
 
 if not cap.isOpened():
@@ -220,7 +220,7 @@ while True:
         print("Can't receive frame (stream end?). Exiting ...")
         break
     resized_frame = cv2.resize(frame, (512,288))
-    results = model.predict(resized_frame, verbose=True, imgsz=512)
+    results = model.predict(resized_frame, verbose=True, imgsz=512,conf=0.7)
     object_detected = False
     start_time_loop = time.time()
    
@@ -242,7 +242,7 @@ while True:
             if detected == False:
                 detected = True
                 startTime = time.time()
-            if cls == 1: #or cls == 1 or cls == 2:
+            if cls == 5: #or cls == 1 or cls == 2:
 
 
     
@@ -320,7 +320,7 @@ while True:
                             rtde_c.servoJ(position, velocity, acceleration, dt, lookahead_time, gain)
                     else: 
                     
-                        end_effector_pose.t[0] = end_effector_pose.t[0] - (4* 0.01)
+                        end_effector_pose.t[0] = end_effector_pose.t[0] - (12* 0.01)
                         end_effector_pose.t[1] = end_effector_pose.t[1] 
                         
                         sol = robot.ikine_LM(end_effector_pose,jp)
@@ -335,7 +335,7 @@ while True:
                         if grab[0] == 0:
                             print(grabcount)
                             grabcount += 1
-                        if grab[0] == 0 and grabcount == 2:
+                        if grab[0] == 0 and grabcount == 3:
                             
                             print("Grab")
                             gripper.move_and_wait_for_pos(255, 255, 255)
@@ -350,11 +350,11 @@ while True:
                             pickuptime = time.time() - startTime
                             print(f"Dynamic Time: {pickuptime}")
                             rounded_position = [round(p, 4) for p in position]
-                            #with open("/Users/matthiaspetry/Desktop/Masterarbeit/Y_CubeDynamicEvaluation4mMultiple.txt", 'a') as text_file:
-                                #positions_str1 = f"Position {counter}: "
-                                #positions_str2 = ",".join(map(str, rounded_position))
-                                #text_file.write(positions_str1 + positions_str2 +","+str(pickuptime) + "\n")
-                                #counter += 1
+                            with open("/Users/matthiaspetry/Desktop/Masterarbeit/YCubeDynamicEvaluation12m2.txt", 'a') as text_file:
+                                positions_str1 = f"Position {counter}: "
+                                positions_str2 = ",".join(map(str, rounded_position))
+                                text_file.write(positions_str1 + positions_str2 +","+str(pickuptime) + "\n")
+                                counter += 1
                            
                             position[1] -= 10 * (math.pi / 180)
                             rtde_c.servoStop()
@@ -376,8 +376,8 @@ while True:
 
                         
 
-                        cv2.imwrite(f'Gripper/image{counter}.jpg', frame)
-                        counter += 1
+                        #cv2.imwrite(f'Gripper/hex{counter}.jpg', frame)
+                        #counter += 1
 
 
 

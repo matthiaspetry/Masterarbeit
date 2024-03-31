@@ -11,7 +11,7 @@ import { Card } from "@tremor/react";
 export default function Home() {
   return (
     <main className="pt-4 pl-4 pr-4" >
-      <div className="grid grid-cols-5 grid-rows-6 gap-4  ">
+      <div className="grid grid-cols-5 grid-rows-6 gap-4">
         <div className="col-span-2 row-span-3 h-full">
           <Card className="h-full">
             <Livefeed/>

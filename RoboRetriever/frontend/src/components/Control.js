@@ -2,9 +2,19 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { Select, SelectItem } from '@tremor/react';
+import React, { useContext, useEffect } from 'react';
+import UrlContext from '../UrlContext';
+import DynamicContext from './DynamicContext'; // Import the DynamicContext
+
 
 const Control = () => {
-    const apiUrl = 'http://localhost:5000';  // Replace with your Flask server URL
+    const url = useContext(UrlContext);
+    const { isDynamic } = useContext(DynamicContext);
+
+    useEffect(() => {
+        console.log("Chart:" + isDynamic)
+        console.log("URL prop: ", url);
+    }, [url,isDynamic]);
     const [selectedImage, setSelectedImage] = useState('');
 
     // Assuming you store your images in the public folder in Next.js
@@ -20,7 +30,7 @@ const Control = () => {
     };
 
     const start_processing = () => {
-        fetch(`${apiUrl}/start_processing`, {
+        fetch(`${url}/start_processing`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         })
@@ -30,7 +40,7 @@ const Control = () => {
     };
 
     const connect_robot = () => {
-        fetch(`${apiUrl}/connect_robot`, {
+        fetch(`${url}/connect_robot`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         })
@@ -40,7 +50,7 @@ const Control = () => {
     };
 
     const stop_processing = () => {
-        fetch(`${apiUrl}/stop_processing`, {
+        fetch(`${url}/stop_processing`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         })
@@ -50,7 +60,7 @@ const Control = () => {
     };
 
     const free_mode = () => {
-        fetch(`${apiUrl}/free_mode`, {
+        fetch(`${url}/free_mode`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         })
@@ -60,7 +70,7 @@ const Control = () => {
     };
 
     const set_position = () => {
-        fetch(`${apiUrl}/set_position`, {
+        fetch(`${url}/set_position`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         })
@@ -70,7 +80,16 @@ const Control = () => {
     };
 
     const move_2_base = () => {
-        fetch(`${apiUrl}/move_2_base`, {
+        fetch(`${url}/move_2_base`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        })
+        .then(response => response.json())
+        .then(data => console.log(data))
+        .catch(error => console.error('Error:', error));
+    };
+    const pickup = () => {
+        fetch(`${url}/pickupObject`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         })
@@ -85,7 +104,7 @@ const Control = () => {
         const selectedValue = event
         console.log("Selected Value:", selectedValue);
 
-        fetch(`${apiUrl}/select_object`, {
+        fetch(`${url}/select_object`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ object_type: selectedValue })  // Send the selected value in the request body
@@ -102,7 +121,7 @@ const Control = () => {
 
         setSelectedImage(objectImages[selectedValue] || '');
     
-        fetch(`${apiUrl}/select_model`, {
+        fetch(`${url}/select_model`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ object_type: selectedValue })  // Send the selected value in the request body
@@ -118,7 +137,7 @@ const Control = () => {
         console.log("Selected Value:", selectedValue);
 
     
-        fetch(`${apiUrl}/select_speed`, {
+        fetch(`${url}/select_speed`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ object_type: selectedValue })  // Send the selected value in the request body
@@ -135,7 +154,7 @@ const Control = () => {
 
     return (
         <div>
-        <h2 className="text-lg font-semibold mb-4">Robot Control</h2>
+        <h2 className="text-xl font-semibold mb-4">Robot Control</h2>
         <div >
         <div className="grid grid-cols-2 gap-4">
                 <button onClick={start_processing} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
@@ -159,7 +178,7 @@ const Control = () => {
 
             
 
-                <Select id="object" name="object" placeholder="Select an Object" value={object} onValueChange={handleDropdownObject} className="text-xl font-bold">
+                <Select id="object" name="object" placeholder="Select an Object" value={object} onValueChange={handleDropdownObject} className="text-xl font-bold ">
                     <SelectItem value="0" >
                     Cross
                     </SelectItem>
@@ -176,14 +195,11 @@ const Control = () => {
                     Pyramid
                     </SelectItem>
                     <SelectItem value="5">
-                    Star
-                    </SelectItem>
-                    <SelectItem value="6">
                     Y_Cube
                     </SelectItem>
                 </Select>
 
-                <Select id="model" name="model" placeholder="Select a Model" value={model} onValueChange={handleDropdownModel} className="text-xl font-semibold">
+                <Select id="model" name="model" placeholder="Select a Model" value={model} onValueChange={handleDropdownModel} className="text-xl font-bold">
                     <SelectItem value="FastVit Backbone" >
                     FastVit Backbone
                     </SelectItem>
@@ -195,20 +211,20 @@ const Control = () => {
                     </SelectItem>
                 </Select>
 
-                <Select id="speed" name="speed" placeholder="Set Conveyor Speed" value={speed} onValueChange={handleDropdownSpeed} className=" text-xl font-semibold">
-                    <SelectItem value="66 mm/s" >
-                    66 mm/s
-                    </SelectItem>
-                    <SelectItem value="120 mm/s" >
-                    120 mm/s
-                    </SelectItem>
-                    <SelectItem value="150 mm/s" >
-                    150 mm/s
-                    </SelectItem>
-                    <SelectItem value="200 mm/s" >
-                    200 mm/s
-                    </SelectItem>
-                </Select>
+                {isDynamic && (
+                        <Select id="speed" name="speed" placeholder="Set Conveyor Speed" value={speed} onValueChange={handleDropdownSpeed} className=" text-xl font-bold">
+                            <SelectItem value="4">66 mm/s</SelectItem>
+                            <SelectItem value="6">120 mm/s</SelectItem>
+                            <SelectItem value="8">150 mm/s</SelectItem>
+                            <SelectItem value="12">200 mm/s</SelectItem>
+                        </Select>
+                    )}
+
+                    {!isDynamic && (
+                        <button onClick={pickup} className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded col-span-2">
+                            PickUp Object
+                        </button>
+                    )}
 
 
                

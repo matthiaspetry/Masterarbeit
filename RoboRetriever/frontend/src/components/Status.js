@@ -1,9 +1,18 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect , useContext } from 'react';
 import { Badge,BadgeDelta } from "@tremor/react";
+import UrlContext from '../UrlContext';
+import DynamicContext from './DynamicContext'; // Import the DynamicContext
+
 
 
 const Status = () => {
+
+  const url = useContext(UrlContext);
+  const { isDynamic } = useContext(DynamicContext);
+
+
+
   const [statusData, setStatusData] = useState({
     isConnected: false,
     operationalStatus: false, // Updated to use boolean
@@ -12,7 +21,9 @@ const Status = () => {
   });
 
   useEffect(() => {
-    const apiUrl = 'http://127.0.0.1:5000/status';
+    console.log("URL prop: ", url);
+    const apiUrl = url + '/status';
+    console.log(apiUrl)
 
     const fetchData = async () => {
       try {
@@ -41,11 +52,11 @@ const Status = () => {
 
     // Cleanup interval on component unmount
     return () => clearInterval(intervalId);
-  }, []); // Empty dependency array ensures this effect runs only once on mount
+  }, [url,isDynamic]); // Empty dependency array ensures this effect runs only once on mount
 
   return (
     <div>
-      <h3 className="text-lg font-semibold mb-4">Robotic Arm Status</h3>
+      <h3 className="text-xl font-semibold mb-4">Robotic Arm Status</h3>
       
       <div className="grid grid-cols-2 gap-2">
         <span className="font-medium">Robot Arm:</span>

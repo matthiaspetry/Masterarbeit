@@ -3,7 +3,7 @@ import React from 'react'
 const Stats = () => {
   return (
     <div className='h-fit'>
-    <h3 className="text-lg font-semibold mb-4">Stats</h3>
+    <h3 className="text-xl font-semibold mb-4">Stats</h3>
     
     <div className="grid grid-cols-2 gap-2">
       <span className="font-medium">Success Rate:</span>
