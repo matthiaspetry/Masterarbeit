@@ -7,11 +7,8 @@ import DynamicContext from './DynamicContext'; // Import the DynamicContext
 
 
 const Status = () => {
-
   const url = useContext(UrlContext);
   const { isDynamic } = useContext(DynamicContext);
-
-
 
   const [statusData, setStatusData] = useState({
     isConnected: false,
@@ -22,36 +19,29 @@ const Status = () => {
 
   useEffect(() => {
     console.log("URL prop: ", url);
-    const apiUrl = url + '/status';
+    const apiUrl = url + '/status'; // Update the URL to the SSE endpoint
     console.log(apiUrl)
 
-    const fetchData = async () => {
-      try {
-        const response = await fetch(apiUrl);
-        const data = await response.json();
+    const eventSource = new EventSource(apiUrl);
 
-        console.log( data.objectPlacePosition)
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log(data);
 
-        setStatusData({
-          isConnected: data.isConnected,
-          gripperConnection: data.gripperConnection,
-          operationalStatus: data.operationalStatus,
-          currentTask: data.currentTask,
-          errorStatus: data.errorStatus,
-          objectPickedUp: data.objectPickedUp,
-          selectedSpeed: data.selectedSpeed,
-          selectedModel: data.selectedModel
-        });
-      } catch (error) {
-        console.error('Error fetching data: ', error);
-      }
+      setStatusData({
+        isConnected: data.isConnected,
+        gripperConnection: data.gripperConnection,
+        operationalStatus: data.operationalStatus,
+        currentTask: data.currentTask,
+        errorStatus: data.errorStatus,
+        objectPickedUp: data.objectPickedUp,
+        selectedSpeed: data.selectedSpeed,
+        selectedModel: data.selectedModel
+      });
     };
 
-    // Call fetchData every 1000 milliseconds (1 second)
-    const intervalId = setInterval(fetchData, 5000);
-
-    // Cleanup interval on component unmount
-    return () => clearInterval(intervalId);
+    // Cleanup eventSource on component unmount
+    return () => eventSource.close();
   }, [url,isDynamic]); // Empty dependency array ensures this effect runs only once on mount
 
   return (

@@ -17,9 +17,44 @@ import roboticstoolbox as rtb
 import random 
 import pickle
 import math
+import json
+
 
 app = Flask(__name__)
 cors = CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+
+class MessageAnnouncer:
+
+    def __init__(self):
+        self.listeners = []
+
+    def listen(self):
+        self.listeners.append(queue.Queue(maxsize=5))
+        return self.listeners[-1]
+
+    def announce(self, msg):
+        # We go in reverse order because we might have to delete an element, which will shift the
+        # indices backward
+        for i in reversed(range(len(self.listeners))):
+            try:
+                self.listeners[i].put_nowait(msg)
+            except queue.Full:
+                del self.listeners[i]
+
+announcer = MessageAnnouncer()
+
+def format_sse(data: str, event=None) -> str:
+    """Formats a string and an event name in order to follow the event stream convention.
+
+    >>> format_sse(data=json.dumps({'abc': 123}), event='Jackson 5')
+    'event: Jackson 5\\ndata: {"abc": 123}\\n\\n'
+
+    """
+    msg = f'data: {data}\n\n'
+    if event is not None:
+        msg = f'event: {event}\n{msg}'
+    return msg
+
 
 
 # Shared variables
@@ -64,23 +99,6 @@ dh_params = np.array([
 robot = rtb.DHRobot([
     rtb.RevoluteDH(d=dh_params[i, 1], a=dh_params[i, 2], alpha=dh_params[i, 3]) for i in range(6)
 ], name='UR3e')
-
-def init_undistortion_maps(cameraMatrix, dist, width, height):
-    newCameraMatrix, roi = cv2.getOptimalNewCameraMatrix(cameraMatrix, dist, (width, height), 1, (width, height))
-    mapx, mapy = cv2.initUndistortRectifyMap(cameraMatrix, dist, None, newCameraMatrix, (width, height), 5)
-    return mapx, mapy, roi
-
-def fast_undistort_image(img, mapx, mapy, roi):
-    dst = cv2.remap(img, mapx, mapy, cv2.INTER_LINEAR)
-    x, y, w, h = roi
-    dst = dst[y:y+h, x:x+w]
-    return dst
-
-with open("/Users/matthiaspetry/Desktop/Masterarbeit/calibration.pkl", "rb") as file:
-    cameraMatrix, dist = pickle.load(file)
-
-mapx, mapy, roi = init_undistortion_maps(cameraMatrix, dist, 1920, 1080)
-
 
 mean = -0.02049437658091184
 std = 1.4781722524455945
@@ -718,9 +736,9 @@ def dataCount():
 
 
 
-@app.route('/status',methods=["GET","OPTIONS"])
+@app.route('/status2',methods=["POST","OPTIONS"])
 @cross_origin(origins="http://localhost:3000", headers=['Content-Type'], methods=['GET'])
-def status():
+def status2():
  
     if request.method == 'OPTIONS':
         # Flask-cors will handle the OPTIONS request
@@ -754,15 +772,86 @@ def status():
         'operationalStatus': is_processing_active,
         'currentTask': obj,
         'errorStatus': 'No Errors',
-        "objectPickedUp": objectPicked,
+        "objectPickedUp": objectPickedUp,
         "objectPlacePosition": objectPlacePositionSet,
         "selectedModel": selected_model,
         "selectedSpeed": selected_speed,
         
     }
+    #response = make_response(jsonify(data))
+    #response.headers["Content-Type"] = "application/json"
+    #return response
+    
+    # Publish the data as an SSE update
+    sse.publish(data, type='status')
+
     response = make_response(jsonify(data))
     response.headers["Content-Type"] = "application/json"
     return response
+
+
+@app.route('/status', methods=['GET'])
+def status():
+    def stream():
+        while True:
+            if selected_object == None:
+                selected = None
+            else:
+                selected = int(selected_object)
+
+            if selected == 0:
+                obj = "Cross"
+            elif selected == 1:
+                obj = "Cube"
+            elif selected == 2:
+                obj = "Cylinder"
+            elif selected == 3:
+                obj = "Hexagon"
+            elif selected == 4:
+                obj = "Pyramid"
+            elif selected == 5:
+                obj = "Y_Cube"
+            elif selected == None:
+                obj = "Not Selected"
+
+            if mode == True:
+
+                if selected_speed == None:
+                    speedstr = "Not Selected"
+
+                elif int(selected_speed) == 4:
+                    speedstr = "66 mm/s"
+                elif int(selected_speed) == 6:
+                    speedstr = "120 mm/s"
+                elif int(selected_speed) == 8:
+                    speedstr = "150 mm/s"
+                elif int(selected_speed) == 12:
+                    speedstr = "200 mm/s"
+
+            else:
+                speedstr = "Not Selected"
+
+
+         
+            
+
+
+
+            data = {
+                'isConnected': roboConnection,
+                'gripperConnection': gripperConnection,
+                'operationalStatus': is_processing_active,
+                'currentTask': obj,
+                'errorStatus': 'No Errors',
+                "objectPickedUp": objectPickedUp,
+                "objectPlacePosition": objectPlacePositionSet,
+                "selectedModel": selected_model,
+                "selectedSpeed": speedstr,
+            }
+            msg = format_sse(data=json.dumps(data))
+            yield msg
+
+    return Response(stream(), mimetype='text/event-stream')
 
 
 @app.route('/')
