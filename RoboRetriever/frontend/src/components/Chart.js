@@ -14,6 +14,7 @@ const Chart = () => {
 
 
 
+
   const [activeTab, setActiveTab] = useState(0);
   const [barData, setBarData] = useState([]);
   const [lineChartData, setLineChartData] = useState([]);
@@ -26,7 +27,7 @@ const Chart = () => {
   ];
 
 
-  const colors = ['#ff7f50', '#ff2717', '#0069e3', '#6c5ce7', '#82ca9d',"#ffc658"];
+  const colors = ['#ff7f50', '#ff2717', '#6c5ce7', '#0069e3', '#82ca9d',"#ffc658"];
 
 const getColor = (index) => {
   return colors[index % colors.length];
@@ -79,8 +80,17 @@ const getColor = (index) => {
     };
 
     const fetchLineChartData = async () => {
-      const response = await fetch(url +'/dataTime'); // Fetch line chart data from backend
-      return await response.json();
+      try {
+        const response = await fetch(url + '/dataTime'); // Fetch line chart data from backend
+        if (!response.ok) { // Check if the response status code is not successful
+          throw new Error('Network response was not ok: ' + response.statusText);
+        }
+        return await response.json(); // Parse and return the JSON data
+      } catch (error) {
+        console.error('There was a problem fetching the chart data:', error);
+        // Handle the error or return a default/fallback data structure
+        return null; // or return {} or some default data structure that your application expects
+      }
     };
 
     const fetchBarChartData = async () => {
@@ -106,16 +116,36 @@ const getColor = (index) => {
     <div className="flex">
       <div className="flex flex-col p-4">
         <div className="text-xl font-semibold mb-4">Charts</div>
-        <button className={activeTab === 0 ? "tab tab-active" : "tab"} onClick={() => handleTabClick(0)}>Pick-up Time</button>
-        <button className={activeTab === 1 ? "tab tab-active" : "tab"} onClick={() => handleTabClick(1)}>Pick-up Location</button>
+        <button className={activeTab === 0 ? "tab tab-active" : "tab"} onClick={() => handleTabClick(0)}>Pick-up Location</button>
+        <button className={activeTab === 1 ? "tab tab-active" : "tab"} onClick={() => handleTabClick(1)}>Dynamic Grasping Time</button>
         <button className={activeTab === 2 ? "tab tab-active" : "tab"} onClick={() => handleTabClick(2)}>Object Count</button>
 
       </div>
       <div className="tab-content p-4">
+        
         {activeTab === 0 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Pick-up Location</h3>
+            {scatterChartData.length > 0 && (  // Check if scatterChartData has data
+              <ScatterChart width={1000} height={580}  >
+                <XAxis type="number" dataKey="x" name="x" domain={[-0.5, 0.5]} unit="m"/>
+                <YAxis dataKey="y" name="y" domain={[-0.5, 0]} unit="cm" />
+                <CartesianGrid />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                <Scatter name="Pick-up Location" data={scatterChartData} fill="#8884d8" />
+                <Scatter name="Robot Arm" data={data01} fill="#000000" shape="cross" />
+                <Legend />
+              </ScatterChart>
+            )}
+            {scatterChartData.length === 0 && (  // Display message if no data
+              <p>No pick-up location data available.</p>
+            )}
+          </div>
+        )}
+        {activeTab === 1 && (
           
           <div>
-            <h3 className="text-lg font-semibold mb-4">Pick-up Time</h3>
+            <h3 className="text-lg font-semibold mb-4">Dynamic Grasping Time</h3>
             
             {lineChartData.length > 0 && (  // Check if lineChartData has data
             <LineChart width={1000} height={580}  data={lineChartData}>
@@ -141,30 +171,11 @@ const getColor = (index) => {
           </div>
          
         )}
-        {activeTab === 1 && (
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Pick-up Location</h3>
-            {scatterChartData.length > 0 && (  // Check if scatterChartData has data
-              <ScatterChart width={1000} height={580}  >
-                <XAxis type="number" dataKey="x" name="x" domain={[-0.5, 0.5]}/>
-                <YAxis dataKey="y" name="y" domain={[-0.5, 0]} />
-                <CartesianGrid />
-                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                <Scatter name="Pick-up Location" data={scatterChartData} fill="#8884d8" />
-                <Scatter name="Robot Arm" data={data01} fill="#8884d8" shape="star" />
-                <Legend />
-              </ScatterChart>
-            )}
-            {scatterChartData.length === 0 && (  // Display message if no data
-              <p>No pick-up location data available.</p>
-            )}
-          </div>
-        )}
         {activeTab === 2 && (
           <div>
             <h3 className="text-lg font-semibold mb-4">Object Count</h3>
 
-            {scatterChartData.length > 0 && (
+            {barData.length > 0 && (
             <BarChart
             width={1000} height={580} 
           data={barData}
@@ -188,7 +199,7 @@ const getColor = (index) => {
           
         </BarChart>
         )}
-        {scatterChartData.length === 0 && (  // Display message if no data
+        {barData.length === 0 && (  // Display message if no data
               <p>No data available.</p>
             )}
           </div>

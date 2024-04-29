@@ -18,16 +18,6 @@ const Control = () => {
     const [selectedImage, setSelectedImage] = useState('');
 
     // Assuming you store your images in the public folder in Next.js
-    const objectImages = {
-        "0": "/Users/matthiaspetry/Desktop/Masterarbeit/RoboRetriever/frontend/public/cross.jpeg", // Adjust paths based on your actual images location
-        "1": "/Users/matthiaspetry/Desktop/Masterarbeit/RoboRetriever/frontend/public/redcube.jpg",
-        "2": "/images/cylinder.png",
-        "3": "/images/hexagon.png",
-        "4": "/Users/matthiaspetry/Desktop/Masterarbeit/RoboRetriever/frontend/public/Pyramid.jpg",
-        "5": "/images/r_cylinder.png",
-        "6": "/images/star.png",
-        "7": "/images/y_cube.png",
-    };
 
     const start_processing = () => {
         fetch(`${url}/start_processing`, {
@@ -118,8 +108,6 @@ const Control = () => {
         setModel(event)
         const selectedValue = event;
         console.log("Selected Value:", selectedValue);
-
-        setSelectedImage(objectImages[selectedValue] || '');
     
         fetch(`${url}/select_model`, {
             method: 'POST',
@@ -216,7 +204,7 @@ const Control = () => {
                             <SelectItem value="4">66 mm/s</SelectItem>
                             <SelectItem value="6">120 mm/s</SelectItem>
                             <SelectItem value="8">150 mm/s</SelectItem>
-                            <SelectItem value="12">200 mm/s</SelectItem>
+                            <SelectItem value="10">200 mm/s</SelectItem>
                         </Select>
                     )}
 

@@ -14,7 +14,7 @@ const Livefeed = () => {
 
   return (
     <div>
-      <h2 className=" text-lg font-semibold mb-4 ">Live Feed</h2>
+      <h2 className=" text-xl font-semibold mb-4 ">Live Feed</h2>
       <div className="relative" style={{ maxWidth: '800px' }}>
         {/* Adjust the maxWidth to your desired width */}
         <img

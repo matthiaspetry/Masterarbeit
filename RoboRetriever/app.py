@@ -23,37 +23,6 @@ import json
 app = Flask(__name__)
 cors = CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 
-class MessageAnnouncer:
-
-    def __init__(self):
-        self.listeners = []
-
-    def listen(self):
-        self.listeners.append(queue.Queue(maxsize=5))
-        return self.listeners[-1]
-
-    def announce(self, msg):
-        # We go in reverse order because we might have to delete an element, which will shift the
-        # indices backward
-        for i in reversed(range(len(self.listeners))):
-            try:
-                self.listeners[i].put_nowait(msg)
-            except queue.Full:
-                del self.listeners[i]
-
-announcer = MessageAnnouncer()
-
-def format_sse(data: str, event=None) -> str:
-    """Formats a string and an event name in order to follow the event stream convention.
-
-    >>> format_sse(data=json.dumps({'abc': 123}), event='Jackson 5')
-    'event: Jackson 5\\ndata: {"abc": 123}\\n\\n'
-
-    """
-    msg = f'data: {data}\n\n'
-    if event is not None:
-        msg = f'event: {event}\n{msg}'
-    return msg
 
 
 
@@ -83,7 +52,14 @@ PyramidCount = 0
 Y_CubeCount = 0
 OBJECTCOUNT = 0
 MISSEDCOUNT = 0
+OBJECTCOUNTSTATIC = 0
+MISSEDSTATIC = 0
+OBJECTCOUNTDYNAMIC = 0
+MISSEDDYNAMIC = 0
+TOTALCOUNTSTATIC = OBJECTCOUNTSTATIC + MISSEDSTATIC
+TOTALCOUNTDYNAMIC = OBJECTCOUNTDYNAMIC + MISSEDDYNAMIC
 TOTALCOUNT = OBJECTCOUNT + MISSEDCOUNT
+completePickTime = 0
 
 
 
@@ -157,26 +133,26 @@ class LayerNormFastViT3DPosition(nn.Module):
 
 def main_processing_loop():
     global is_processing_active, rtde_c, rtde_r
-    global cap, rounded_position, pickuptime, mode,pickup ,OBJECTCOUNT, MISSEDCOUNT,objectPicked,selected_speed
-    global CrossCount, CubeCount, CylinderCount, HexagonCount, PyramidCount, Y_CubeCount
+    global cap, rounded_position, pickuptime, mode,pickup ,OBJECTCOUNT, MISSEDCOUNT,objectPicked,selected_speed,OBJECTCOUNTSTATIC, MISSEDSTATIC,OBJECTCOUNTDYNAMIC, MISSEDDYNAMIC
+    global CrossCount, CubeCount, CylinderCount, HexagonCount, PyramidCount, Y_CubeCount,completePickTime
 
 
     model = YOLO("yolov8s.yaml")  # build a new model from scratch
-    model = YOLO("/Users/matthiaspetry/Desktop/kaggle 7/working/runs/detect/train/weights/best.pt") 
-    state_dict = torch.load("/Users/matthiaspetry/Desktop/Masterarbeit/models/T8_86_145.pth",map_location=torch.device('cpu'))
+    model = YOLO("/Users/matthiaspetry/Desktop/Masterarbeit-master/models/YoloV8.pt") 
+    state_dict = torch.load("/Users/matthiaspetry/Desktop/Masterarbeit-master/models/T8_86_145.pth",map_location=torch.device('mps'))
     # Assuming EfficientNet3DPosition is the class of your model
     joint_model = LayerNormFastViT3DPosition()
     # Load the state_dict into the model
     joint_model.load_state_dict(state_dict)
-    joint_model.to("cpu")
+    joint_model.to("mps")
     joint_model.eval()
 
     model_name = "resnet10t.c3_in1k"  # Example model name, change as per need
     model2 = timm.create_model(model_name, pretrained=False, num_classes=2)
-    state_dict2 = torch.load("/Users/matthiaspetry/Desktop/kaggle 6/working/binary_classification.pth",map_location=torch.device('cpu'))
+    state_dict2 = torch.load("/Users/matthiaspetry/Desktop/Masterarbeit-master/models/DecisionModel.pth",map_location=torch.device('mps'))
     # Assuming EfficientNet3DPosition is the class of your model
     model2.load_state_dict(state_dict2)
-    model2.to("cpu")
+    model2.to("mps")
     model2.eval()
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -197,6 +173,9 @@ def main_processing_loop():
     detected = False
 
     grabcount = 0
+    startTime = None
+    detected = False
+
     
 
     while True:
@@ -228,7 +207,7 @@ def main_processing_loop():
                         print("Can't receive frame (stream end?). Exiting ...")
                         break
                     resized_frame = cv2.resize(frame, (512,288))
-                    results = model.predict(resized_frame, verbose=False, imgsz=512)
+                    results = model.predict(resized_frame, verbose=False, imgsz=512,device = "mps")
                     object_detected = False
                     start_time_loop = time.time()
                     for result in results:
@@ -236,9 +215,8 @@ def main_processing_loop():
                         classes = result.boxes.cls.tolist()
 
                         for i, cls in enumerate(classes):
-                            if detected == False:
-                                detected = True
-                                startTime = time.time()
+
+                               
                             if cls == int(selected_object):
                                 object_detected = True
                                 xn, yn, wn, hn = boxes[i]
@@ -286,12 +264,13 @@ def main_processing_loop():
                                 img_batched2 = img_normalized2.unsqueeze(0)
                                 with torch.no_grad():
                 
-                                    outputs = joint_model(img_batched, bboxs)
+                                    outputs = joint_model(img_batched.to("mps"), bboxs.to("mps"))
                                     
                                     # Reverse scaling to get the actual joint positions
-                                    jp = reverse_standard_scaling(mean, std, outputs.numpy())[0]
-                                    between_jp= reverse_standard_scaling(mean,std,outputs.numpy())[0]
-                                    between_jp2 = reverse_standard_scaling(mean,std,outputs.numpy())[0]
+                                    
+                                    jp = reverse_standard_scaling(mean, std, outputs.cpu().numpy())[0]
+                                    between_jp= reverse_standard_scaling(mean, std, outputs.cpu().numpy())[0]
+                                    between_jp2 = reverse_standard_scaling(mean, std, outputs.cpu().numpy())[0]
                                     between_jp[1] -= 5 * (math.pi / 180)
                                     between_jp[2] -= 5 * (math.pi / 180)# Increase joint 2 by 10 degrees (converted to radians)
                                     between_jp[3] += 5 * (math.pi / 180)
@@ -322,10 +301,15 @@ def main_processing_loop():
                                             PyramidCount += 1
                                         elif int(selected_object) == 5:
                                             Y_CubeCount += 1
+
+                                        OBJECTCOUNT += 1
+                                        OBJECTCOUNTSTATIC += 1
                                     else:
                                         rtde_c.moveJ(joint_q,3, 3)
                                         gripper.move_and_wait_for_pos(0, 255, 255)
                                         time.sleep(5)
+                                        MISSEDCOUNT += 1
+                                        MISSEDSTATIC += 1
 
 
                                 
@@ -371,15 +355,23 @@ def main_processing_loop():
                 object_detected = False
                 start_time_loop = time.time()
 
+
                 for result in results:
                     boxes = result.boxes.xywhn.tolist()
                     classes = result.boxes.cls.tolist()
 
                     for i, cls in enumerate(classes):
-                        if detected == False:
-                            detected = True
-                            startTime = time.time()
+                
+                        
+                            
+                            
                         if cls == int(selected_object):
+                            if detected == False:
+                                detected = True
+                                startTime = time.time()
+                                print(f"Start Time: {startTime}")
+                            
+                            
                             object_detected = True
                             xn, yn, wn, hn = boxes[i]
                             bbox_tensor = torch.tensor([xn, yn, wn, hn])
@@ -425,11 +417,13 @@ def main_processing_loop():
                             img_normalized2 = normalize(img_tensor2)
                             img_batched2 = img_normalized2.unsqueeze(0)
                             with torch.no_grad():
+                                img_batched = img_batched.to("mps")
+                                bboxs = bboxs.to("mps")
                 
                                 outputs = joint_model(img_batched, bboxs)
                                 
                                 # Reverse scaling to get the actual joint positions
-                                jp = reverse_standard_scaling(mean, std, outputs.numpy())[0]
+                                jp = reverse_standard_scaling(mean, std, outputs.cpu().numpy())[0]
 
                                 end_effector_pose = robot.fkine(jp)
 
@@ -452,8 +446,8 @@ def main_processing_loop():
                                     rtde_c.servoJ(jp, velocity, acceleration, dt, lookahead_time, gain)
                                         
 
-                                    pred = model2(img_batched2)
-                                    grab = torch.argmax(pred, dim=1).numpy()
+                                    pred = model2(img_batched2.to("mps"))
+                                    grab = torch.argmax(pred, dim=1).cpu().numpy()
                                     if grab[0] == 0:
                                         
                                         grabcount += 1
@@ -462,12 +456,13 @@ def main_processing_loop():
                                        
                                         gripper.move_and_wait_for_pos(255, 255, 255)
                                         gp = gripper.get_current_position()
-                                        print(f"Gripper: {gripper.get_current_position()}")
+                                        #print(f"Gripper: {gripper.get_current_position()}")
                                         if gp < 248:
                                             objectPickedUp = True
                                     
                                             position = rtde_r.getActualQ()
                                             pickuptime = time.time() - startTime
+                                            completePickTime += pickuptime
 
         
                                             rounded_position = [round(p, 4) for p in position]
@@ -502,12 +497,17 @@ def main_processing_loop():
 
                                             objectPickedUp = False 
                                             OBJECTCOUNT += 1
+                                            OBJECTCOUNTDYNAMIC +=1 
                                             print(f"OBJECTCOUNT: {OBJECTCOUNT}")
                                         
                                             #print(grabcount)
 
                                         else:
+                                            startTime = None
+                                            detected = False
+                                            startTime = None
                                             MISSEDCOUNT += 1
+                                            MISSEDDYNAMIC += 1
                                             print(f"MISSEDCOUNT: {MISSEDCOUNT}")
                                             gripper.move_and_wait_for_pos(0, 255, 255)
                                             rtde_c.servoStop()
@@ -546,7 +546,7 @@ def gen_frames(cap2):
 
 @app.route('/video_feed')
 def video_feed():
-    return Response(gen_frames(cap), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(gen_frames(cap2), mimetype='multipart/x-mixed-replace; boundary=frame')
             
 
 @app.route('/start_processing', methods=['POST'])
@@ -568,7 +568,7 @@ def select_object():
     global selected_object
     data = request.json
     selected_object = data.get('object_type')
-    print(selected_object)
+    #print(selected_object)
     return jsonify({'message': f'Selected object set to {selected_object}'})
 
 @app.route('/select_speed', methods=['POST'])
@@ -576,7 +576,7 @@ def select_speed():
     global selected_speed
     data = request.json
     selected_speed = data.get('object_type')
-    print(selected_speed)
+    #print(selected_speed)
     return jsonify({'message': f'Selected speed set to {selected_speed}'})
 
 @app.route('/select_model', methods=['POST'])
@@ -584,7 +584,7 @@ def select_model():
     global selected_model
     data = request.json
     selected_model = data.get('object_type')
-    print(selected_model)
+    #print(selected_model)
     return jsonify({'message': f'Selected model set to {selected_model}'})
 
 @app.route('/connect_robot', methods=['POST'])
@@ -654,7 +654,7 @@ def change_mode():
         return jsonify({'error': 'Invalid request payload'}), 400
 
     dynamic_state = data['isDynamic']
-    print(f"Dynamic state updated to: {dynamic_state}")
+    #print(f"Dynamic state updated to: {dynamic_state}")
     mode = dynamic_state
 
 
@@ -665,7 +665,7 @@ def change_mode():
 def dataTime():
     global count
     global pickuptime
-    print(pickuptime)
+    #print(pickuptime)
 
     if pickuptime is not None :  # Check if rounded_position is not None
         try:
@@ -725,7 +725,7 @@ def dataCount():
         'Count': Y_CubeCount,
         }
     ]
-    print(data)
+    #print(data)
     response = make_response(jsonify(data))
     response.headers["Content-Type"] = "application/json"
     return response
@@ -736,14 +736,9 @@ def dataCount():
 
 
 
-@app.route('/status2',methods=["POST","OPTIONS"])
-@cross_origin(origins="http://localhost:3000", headers=['Content-Type'], methods=['GET'])
-def status2():
+@app.route('/status',methods=["GET"])
+def status():
  
-    if request.method == 'OPTIONS':
-        # Flask-cors will handle the OPTIONS request
-        return jsonify({})
-
     # Example data, replace with your actual data source
     if selected_object == None:
         selected = None
@@ -765,6 +760,23 @@ def status2():
     elif selected == None:
         obj = "Not Selected"
 
+    if mode == True:
+
+        if selected_speed == None:
+            speedstr = "Not Selected"
+
+        elif int(selected_speed) == 4:
+            speedstr = "66 mm/s"
+        elif int(selected_speed) == 6:
+            speedstr = "120 mm/s"
+        elif int(selected_speed) == 8:
+            speedstr = "150 mm/s"
+        elif int(selected_speed) == 10:
+            speedstr = "200 mm/s"
+
+    else:
+        speedstr = "Not Selected"
+
 
     data = {
         'isConnected': roboConnection,
@@ -775,83 +787,69 @@ def status2():
         "objectPickedUp": objectPickedUp,
         "objectPlacePosition": objectPlacePositionSet,
         "selectedModel": selected_model,
-        "selectedSpeed": selected_speed,
+        "selectedSpeed": speedstr,
         
     }
-    #response = make_response(jsonify(data))
-    #response.headers["Content-Type"] = "application/json"
-    #return response
     
-    # Publish the data as an SSE update
-    sse.publish(data, type='status')
+
+    response = make_response(jsonify(data))
+    response.headers["Content-Type"] = "application/json"
+    #print(response)
+    return response
+
+@app.route("/stats",methods=["GET"])
+def stats():
+    global MISSEDCOUNT,MISSEDDYNAMIC,MISSEDSTATIC
+    global OBJECTCOUNT, OBJECTCOUNTDYNAMIC,OBJECTCOUNTSTATIC,completePickTime
+
+    totalcountstatic = OBJECTCOUNTSTATIC + MISSEDSTATIC
+    totalcountdynamic = OBJECTCOUNTDYNAMIC + MISSEDDYNAMIC
+    totalcount = OBJECTCOUNT + MISSEDCOUNT
+
+
+    if totalcount == 0:
+        data = {
+            "totalCount": totalcount,
+            "successRateDynamic": 0,
+            "successRateStatic": 0,
+            "avgGraspTime": 0,
+            "totalSuccessRate": 0
+        }
+
+    elif totalcountdynamic == 0:
+        data = {
+            "totalCount": totalcount,
+            "successRateDynamic": 0,
+            "successRateStatic":(OBJECTCOUNTSTATIC/totalcountstatic)*100 ,
+            "avgGraspTime": 0,
+            "totalSuccessRate":(OBJECTCOUNT/totalcount) * 100,
+        }
+    elif totalcountstatic == 0:
+        data = {
+            "totalCount": totalcount,
+            "successRateDynamic": (OBJECTCOUNTDYNAMIC/totalcountdynamic) * 100,
+            "successRateStatic": 0,
+            "avgGraspTime": completePickTime/OBJECTCOUNTDYNAMIC,
+            "totalSuccessRate": (OBJECTCOUNT/totalcount) * 100,
+        }
+
+    else:
+        data = {
+            "totalCount": totalcount,
+            "successRateDynamic": (OBJECTCOUNTSTATIC/totalcountstatic)*100 ,
+            "successRateStatic": (OBJECTCOUNTDYNAMIC/totalcountdynamic) * 100,
+            "avgGraspTime": completePickTime/OBJECTCOUNTDYNAMIC,
+            "totalSuccessRate":(OBJECTCOUNT/totalcount) * 100,
+        }
 
     response = make_response(jsonify(data))
     response.headers["Content-Type"] = "application/json"
     return response
 
-
-@app.route('/status', methods=['GET'])
-def status():
-    def stream():
-        while True:
-            if selected_object == None:
-                selected = None
-            else:
-                selected = int(selected_object)
-
-            if selected == 0:
-                obj = "Cross"
-            elif selected == 1:
-                obj = "Cube"
-            elif selected == 2:
-                obj = "Cylinder"
-            elif selected == 3:
-                obj = "Hexagon"
-            elif selected == 4:
-                obj = "Pyramid"
-            elif selected == 5:
-                obj = "Y_Cube"
-            elif selected == None:
-                obj = "Not Selected"
-
-            if mode == True:
-
-                if selected_speed == None:
-                    speedstr = "Not Selected"
-
-                elif int(selected_speed) == 4:
-                    speedstr = "66 mm/s"
-                elif int(selected_speed) == 6:
-                    speedstr = "120 mm/s"
-                elif int(selected_speed) == 8:
-                    speedstr = "150 mm/s"
-                elif int(selected_speed) == 12:
-                    speedstr = "200 mm/s"
-
-            else:
-                speedstr = "Not Selected"
-
-
-         
-            
+    
 
 
 
-            data = {
-                'isConnected': roboConnection,
-                'gripperConnection': gripperConnection,
-                'operationalStatus': is_processing_active,
-                'currentTask': obj,
-                'errorStatus': 'No Errors',
-                "objectPickedUp": objectPickedUp,
-                "objectPlacePosition": objectPlacePositionSet,
-                "selectedModel": selected_model,
-                "selectedSpeed": speedstr,
-            }
-            msg = format_sse(data=json.dumps(data))
-            yield msg
-
-    return Response(stream(), mimetype='text/event-stream')
 
 
 @app.route('/')
