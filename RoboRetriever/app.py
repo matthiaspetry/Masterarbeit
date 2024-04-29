@@ -138,21 +138,21 @@ def main_processing_loop():
 
 
     model = YOLO("yolov8s.yaml")  # build a new model from scratch
-    model = YOLO("/Users/matthiaspetry/Desktop/Masterarbeit-master/models/YoloV8.pt") 
-    state_dict = torch.load("/Users/matthiaspetry/Desktop/Masterarbeit-master/models/T8_86_145.pth",map_location=torch.device('mps'))
+    model = YOLO("/Users/matthiaspetry/Desktop/Masterarbeit/models/best.pt") 
+    state_dict = torch.load("/Users/matthiaspetry/Desktop/Masterarbeit/models/T8_86_145.pth",map_location=torch.device('cpu'))
     # Assuming EfficientNet3DPosition is the class of your model
     joint_model = LayerNormFastViT3DPosition()
     # Load the state_dict into the model
     joint_model.load_state_dict(state_dict)
-    joint_model.to("mps")
+    joint_model.to("cpu")
     joint_model.eval()
 
     model_name = "resnet10t.c3_in1k"  # Example model name, change as per need
     model2 = timm.create_model(model_name, pretrained=False, num_classes=2)
-    state_dict2 = torch.load("/Users/matthiaspetry/Desktop/Masterarbeit-master/models/DecisionModel.pth",map_location=torch.device('mps'))
+    state_dict2 = torch.load("//Users/matthiaspetry/Desktop/Masterarbeit/models/binary_classification.pth",map_location=torch.device('cpu'))
     # Assuming EfficientNet3DPosition is the class of your model
     model2.load_state_dict(state_dict2)
-    model2.to("mps")
+    model2.to("cpu")
     model2.eval()
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -207,7 +207,7 @@ def main_processing_loop():
                         print("Can't receive frame (stream end?). Exiting ...")
                         break
                     resized_frame = cv2.resize(frame, (512,288))
-                    results = model.predict(resized_frame, verbose=False, imgsz=512,device = "mps")
+                    results = model.predict(resized_frame, verbose=False, imgsz=512,device = "cpu")
                     object_detected = False
                     start_time_loop = time.time()
                     for result in results:
@@ -264,13 +264,13 @@ def main_processing_loop():
                                 img_batched2 = img_normalized2.unsqueeze(0)
                                 with torch.no_grad():
                 
-                                    outputs = joint_model(img_batched.to("mps"), bboxs.to("mps"))
+                                    outputs = joint_model(img_batched, bboxs)
                                     
                                     # Reverse scaling to get the actual joint positions
                                     
-                                    jp = reverse_standard_scaling(mean, std, outputs.cpu().numpy())[0]
-                                    between_jp= reverse_standard_scaling(mean, std, outputs.cpu().numpy())[0]
-                                    between_jp2 = reverse_standard_scaling(mean, std, outputs.cpu().numpy())[0]
+                                    jp = reverse_standard_scaling(mean, std, outputs.numpy())[0]
+                                    between_jp= reverse_standard_scaling(mean, std, outputs.numpy())[0]
+                                    between_jp2 = reverse_standard_scaling(mean, std, outputs.numpy())[0]
                                     between_jp[1] -= 5 * (math.pi / 180)
                                     between_jp[2] -= 5 * (math.pi / 180)# Increase joint 2 by 10 degrees (converted to radians)
                                     between_jp[3] += 5 * (math.pi / 180)
@@ -417,13 +417,12 @@ def main_processing_loop():
                             img_normalized2 = normalize(img_tensor2)
                             img_batched2 = img_normalized2.unsqueeze(0)
                             with torch.no_grad():
-                                img_batched = img_batched.to("mps")
-                                bboxs = bboxs.to("mps")
+                               
                 
                                 outputs = joint_model(img_batched, bboxs)
                                 
                                 # Reverse scaling to get the actual joint positions
-                                jp = reverse_standard_scaling(mean, std, outputs.cpu().numpy())[0]
+                                jp = reverse_standard_scaling(mean, std, outputs.numpy())[0]
 
                                 end_effector_pose = robot.fkine(jp)
 
@@ -446,8 +445,8 @@ def main_processing_loop():
                                     rtde_c.servoJ(jp, velocity, acceleration, dt, lookahead_time, gain)
                                         
 
-                                    pred = model2(img_batched2.to("mps"))
-                                    grab = torch.argmax(pred, dim=1).cpu().numpy()
+                                    pred = model2(img_batched2)
+                                    grab = torch.argmax(pred, dim=1).numpy()
                                     if grab[0] == 0:
                                         
                                         grabcount += 1
